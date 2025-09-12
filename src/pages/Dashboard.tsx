@@ -17,10 +17,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [queryText, setQueryText] = useState("");
-  const [sqlRows, setSqlRows] = useState<any[]>([]);
-  const [sqlFilter, setSqlFilter] = useState<"all" | "pending" | "verified" | "rejected">("all");
-  const [sqlLoading, setSqlLoading] = useState<boolean>(false);
-  const [openRegUid, setOpenRegUid] = useState<string | null>(null);
+  // Removed Turso registrations section in favor of direct users table management
 
   // Turso Users (users table) state
   const [tursoUsersRows, setTursoUsersRows] = useState<any[]>([]);
@@ -55,47 +52,9 @@ export default function Dashboard() {
     load();
   }, []);
 
-  async function loadSql() {
-    setSqlLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (sqlFilter !== "all") params.set("status", sqlFilter);
-      params.set("limit", "200");
-      const resp = await fetch(`/api/registrations?${params.toString()}`);
-      const data = await resp.json();
-      if (resp.ok && data?.rows) setSqlRows(data.rows);
-    } catch {}
-    setSqlLoading(false);
-  }
+  // Registrations endpoints removed; no loadSql needed
 
-  useEffect(() => {
-    loadSql();
-  }, [sqlFilter]);
-
-  async function sqlVerify(uid: string, makeVerified: boolean) {
-    try {
-      const reg = sqlRows.find((r) => r.uid === uid);
-      // Upsert users table to ensure visibility in Turso users
-      await fetch(`/api/users/${encodeURIComponent(uid)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          is_verified: makeVerified,
-          app_username: reg?.app_username,
-          leetcode_username: reg?.leetcode_username,
-        }),
-      });
-      // Best effort: also persist status to registrations if available
-      try {
-        await fetch(`/api/registrations`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ uid, status: makeVerified ? "verified" : "pending" }),
-        });
-      } catch {}
-      await loadSql();
-    } catch {}
-  }
+  // Removed registrations verify flow; we only manage users table directly now.
 
   // Load Turso users (users table)
   async function loadTursoUsers() {
@@ -134,47 +93,23 @@ export default function Dashboard() {
     } catch {}
   }
 
-  async function sqlReject(uid: string) {
-    try {
-      // Ensure users table shows unverified
-      await fetch(`/api/users/${encodeURIComponent(uid)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ is_verified: false }),
-      });
-      // Best effort: mark registration rejected
-      try {
-        await fetch(`/api/registrations`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ uid, status: "rejected" }),
-        });
-      } catch {}
-      await loadSql();
-    } catch {}
-  }
+  // Removed registrations reject; not applicable.
 
-  async function sqlDelete(uid: string) {
-    const ok = window.confirm("Delete this SQL registration record?");
-    if (!ok) return;
-    try {
-      await fetch(`/api/registrations/${uid}`, { method: "DELETE" });
-      // Keep users table unverified
-      try {
-        await fetch(`/api/users/${encodeURIComponent(uid)}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ is_verified: false }),
-        });
-      } catch {}
-      await loadSql();
-    } catch {}
-  }
+  // Removed registrations delete; not applicable.
 
   async function toggleVerify(u: UserRow) {
     try {
-      await updateDoc(doc(db, "users", u.id), { is_verified: !u.is_verified });
-      // Mirror to Turso users table
+      // Update Firestore and ensure usernames are present when verifying
+      if (!u.is_verified) {
+        await updateDoc(doc(db, "users", u.id), {
+          is_verified: true,
+          appUserName: u.appUserName ?? null,
+          leetcodeUsername: u.leetcodeUsername ?? null,
+        });
+      } else {
+        await updateDoc(doc(db, "users", u.id), { is_verified: false });
+      }
+      // Mirror to Turso users table (authoritative)
       try {
         await fetch(`/api/users/${encodeURIComponent(u.id)}`, {
           method: "PATCH",
@@ -186,62 +121,49 @@ export default function Dashboard() {
           }),
         });
       } catch {}
-      // Best effort: registrations
-      try {
-        await fetch(`/api/registrations`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            uid: u.id,
-            app_username: u.appUserName,
-            leetcode_username: u.leetcodeUsername,
-            status: !u.is_verified ? "verified" : "pending",
-          }),
-        });
-      } catch {}
       setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, is_verified: !u.is_verified } : x)));
     } catch (e: any) {
       alert(e?.message || "Failed to update");
     }
   }
 
-  async function rejectApplication(u: UserRow) {
+  async function setUnverified(u: UserRow) {
     try {
-      // Firestore: mark not verified (explicit)
       await updateDoc(doc(db, "users", u.id), { is_verified: false });
-      // SQL: set status to rejected
-      await fetch(`/api/registrations`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          uid: u.id,
-          app_username: u.appUserName,
-          leetcode_username: u.leetcodeUsername,
-          status: "rejected",
-        }),
-      });
+      try {
+        await fetch(`/api/users/${encodeURIComponent(u.id)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ is_verified: false }),
+        });
+      } catch {}
       setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, is_verified: false } : x)));
     } catch (e: any) {
-      alert(e?.message || "Failed to reject application");
+      alert(e?.message || "Failed to unverify user");
     }
   }
 
   async function deleteApplication(u: UserRow) {
-    const confirmDelete = window.confirm("Delete this application? This will remove the registration record.");
+    const confirmDelete = window.confirm("Delete this application? This clears usernames and keeps user unverified.");
     if (!confirmDelete) return;
     try {
-      // SQL: delete registration row
-      await fetch(`/api/registrations/${u.id}`, { method: "DELETE" });
-      // Firestore: optionally clear usernames to free them up
+      // Clear in Turso and set unverified
       try {
-        await updateDoc(doc(db, "users", u.id), { appUserName: null, leetcodeUsername: null, is_verified: false });
+        await fetch(`/api/users/${encodeURIComponent(u.id)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clear_usernames: true }),
+        });
       } catch {}
-      // Update UI: keep user but mark not verified
+      // Clear in Firestore
+      await updateDoc(doc(db, "users", u.id), { appUserName: null, leetcodeUsername: null, is_verified: false });
       setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, is_verified: false, appUserName: null, leetcodeUsername: null } : x)));
     } catch (e: any) {
       alert(e?.message || "Failed to delete application");
     }
   }
+
+  // reject/delete application flows removed
 
   const verified = useMemo(() => users.filter((u) => u.is_verified), [users]);
   const pending = useMemo(() => users.filter((u) => !u.is_verified), [users]);
@@ -285,7 +207,7 @@ export default function Dashboard() {
                     </div>
                     <div className="flex items-center gap-2">
                       <button onClick={() => toggleVerify(u)} className="px-3 py-1.5 rounded-md bg-green-600/90 hover:bg-green-600 text-white text-sm">Verify</button>
-                      <button onClick={() => rejectApplication(u)} className="px-3 py-1.5 rounded-md bg-yellow-600/90 hover:bg-yellow-600 text-white text-sm">Reject</button>
+                      <button onClick={() => setUnverified(u)} className="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/15 text-white text-sm">Unverify</button>
                       <button onClick={() => deleteApplication(u)} className="px-3 py-1.5 rounded-md bg-red-700/90 hover:bg-red-700 text-white text-sm">Delete</button>
                     </div>
                   </li>
@@ -378,96 +300,7 @@ export default function Dashboard() {
           )}
         </section>
 
-        <section className="glass-panel p-4 rounded-lg">
-          <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-            <h2 className="font-semibold">Turso Registrations ({sqlRows.length})</h2>
-            <div className="flex items-center gap-2">
-              <select value={sqlFilter} onChange={(e) => setSqlFilter(e.target.value as any)} className="px-2 py-2 rounded-md bg-white/5 border border-white/10">
-                <option value="all">All</option>
-                <option value="pending">Pending</option>
-                <option value="verified">Verified</option>
-                <option value="rejected">Rejected</option>
-              </select>
-              <button onClick={loadSql} className="px-3 py-2 rounded-md bg-white/10 hover:bg-white/15 border border-white/15">Refresh</button>
-            </div>
-          </div>
-          {sqlLoading ? (
-            <div className="text-white/70">Loading…</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left border-b border-white/10">
-                    <th className="py-2 pr-3">UID</th>
-                    <th className="py-2 pr-3">Display Name</th>
-                    <th className="py-2 pr-3">Email</th>
-                    <th className="py-2 pr-3">App Username</th>
-                    <th className="py-2 pr-3">LeetCode</th>
-                    <th className="py-2 pr-3">Avatar</th>
-                    <th className="py-2 pr-3">Created</th>
-                    <th className="py-2 pr-3">Status</th>
-                    <th className="py-2 pr-3">Updated</th>
-                    <th className="py-2 pr-3">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sqlRows.length === 0 ? (
-                    <tr>
-                      <td className="py-3 text-white/70" colSpan={10}>No registrations found.</td>
-                    </tr>
-                  ) : (
-                    sqlRows.map((r) => (
-                      <>
-                        <tr key={r.uid} className="border-b border-white/5">
-                          <td className="py-2 pr-3 max-w-[200px] truncate">{r.uid}</td>
-                          <td className="py-2 pr-3 max-w-[200px] truncate">{r.display_name || ""}</td>
-                          <td className="py-2 pr-3 max-w-[240px] truncate text-white/80">{r.email || ""}</td>
-                          <td className="py-2 pr-3">{r.app_username || ""}</td>
-                          <td className="py-2 pr-3">{r.leetcode_username || ""}</td>
-                          <td className="py-2 pr-3">
-                            {r.avatar_url ? (
-                              <img src={r.avatar_url} alt="avatar" className="w-6 h-6 rounded-full border border-white/15" referrerPolicy="no-referrer" />
-                            ) : (
-                              <span className="text-white/50">-</span>
-                            )}
-                          </td>
-                          <td className="py-2 pr-3">{r.created_at || ""}</td>
-                          <td className="py-2 pr-3 capitalize">{r.status}</td>
-                          <td className="py-2 pr-3">{r.updated_at || ""}</td>
-                          <td className="py-2 pr-3 flex gap-2 items-center">
-                            <button
-                              onClick={() => setOpenRegUid(openRegUid === r.uid ? null : r.uid)}
-                              className="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/15 text-white text-sm"
-                            >
-                              {openRegUid === r.uid ? "Hide" : "Details"}
-                            </button>
-                            {r.status !== 'verified' && (
-                              <button onClick={() => sqlVerify(r.uid, true)} className="px-3 py-1.5 rounded-md bg-green-600/90 hover:bg-green-600 text-white text-sm">Verify</button>
-                            )}
-                            {r.status === 'verified' && (
-                              <button onClick={() => sqlVerify(r.uid, false)} className="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/15 text-white text-sm">Unverify</button>
-                            )}
-                            {r.status !== 'rejected' && (
-                              <button onClick={() => sqlReject(r.uid)} className="px-3 py-1.5 rounded-md bg-yellow-600/90 hover:bg-yellow-600 text-white text-sm">Reject</button>
-                            )}
-                            <button onClick={() => sqlDelete(r.uid)} className="px-3 py-1.5 rounded-md bg-red-700/90 hover:bg-red-700 text-white text-sm">Delete</button>
-                          </td>
-                        </tr>
-                        {openRegUid === r.uid && (
-                          <tr className="border-b border-white/10">
-                            <td colSpan={10} className="py-2">
-                              <pre className="text-xs whitespace-pre-wrap bg-black/30 rounded-md p-2 border border-white/10 overflow-x-auto">{JSON.stringify(r, null, 2)}</pre>
-                            </td>
-                          </tr>
-                        )}
-                      </>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+        {/* Turso Registrations section removed */}
 
         {/* Turso Users table (all columns) */}
         <section className="glass-panel p-4 rounded-lg">

@@ -13,12 +13,34 @@ export default async function handler(req: any, res: any) {
       return res.status(200).json({ ok: true, row: result.rows[0] });
     }
     if (req.method === "POST" || req.method === "PATCH") {
-      const { is_verified, app_username, leetcode_username } = req.body || {};
+      const { is_verified, app_username, leetcode_username, clear_usernames } = req.body || {};
+      if (clear_usernames === true) {
+        // Explicitly clear usernames and set unverified
+        await db.execute({
+          sql: `UPDATE users
+                SET app_username = NULL,
+                    leetcode_username = NULL,
+                    is_verified = 0
+                WHERE user_id = ?`,
+          args: [user_id],
+        });
+        // Ensure a row exists even if it was missing
+        await db.execute({
+          sql: `INSERT OR IGNORE INTO users (
+                  user_id, app_username, leetcode_username, is_verified,
+                  easy_solved, medium_solved, hard_solved, total_solved,
+                  current_streak, longest_streak
+                ) VALUES (?, NULL, NULL, 0, 0, 0, 0, 0, 0, 0)`,
+          args: [user_id],
+        });
+        return res.status(200).json({ ok: true });
+      }
+
       if (typeof is_verified !== "boolean" && app_username === undefined && leetcode_username === undefined) {
         return res.status(400).json({ ok: false, error: "Provide is_verified or a username to update" });
       }
       const iso = typeof is_verified === "boolean" ? (is_verified ? 1 : 0) : null;
-      // Update existing
+      // Update existing with COALESCE for partial updates
       await db.execute({
         sql: `UPDATE users
               SET app_username = COALESCE(?, app_username),
