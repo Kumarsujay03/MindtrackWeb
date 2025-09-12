@@ -18,6 +18,11 @@ export function getClient() {
   return client;
 }
 
+// Provide a getDb alias to match TypeScript imports used across API routes.
+export function getDb() {
+  return getClient();
+}
+
 export async function run(sql, args = []) {
   const c = getClient();
   // Supports positional args (array) or named args (object)
