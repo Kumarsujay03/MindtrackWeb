@@ -1,4 +1,4 @@
-import { getDb } from "./_lib/db";
+import { getDb } from "./_lib/db.js";
 
 function setCors(res: any) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -53,6 +53,7 @@ export default async function handler(req: any, res: any) {
 
     res.status(200).json({ ok: true, data: result.rows });
   } catch (err: any) {
+    console.error("/api/questions error:", err);
     res.status(500).json({ ok: false, error: err?.message ?? "Internal error" });
   }
 }

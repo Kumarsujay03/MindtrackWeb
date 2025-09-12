@@ -1,4 +1,4 @@
-import { getDb } from "./_lib/db";
+import { getDb } from "./_lib/db.js";
 
 function setCors(res: any) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -50,6 +50,7 @@ export default async function handler(req: any, res: any) {
           usersCount,
         };
       } catch (dbErr: any) {
+        console.error("/api/health db error:", dbErr);
         result.db = { ok: false, error: dbErr?.message || String(dbErr) };
         result.ok = false;
       }
@@ -57,6 +58,7 @@ export default async function handler(req: any, res: any) {
 
     res.status(200).json(result);
   } catch (err: any) {
+    console.error("/api/health error:", err);
     res.status(500).json({ ok: false, error: err?.message || "Internal error" });
   }
 }

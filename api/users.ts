@@ -1,4 +1,4 @@
-import { getDb } from "./_lib/db";
+import { getDb } from "./_lib/db.js";
 
 function setCors(res: any) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -15,18 +15,22 @@ export default async function handler(req: any, res: any) {
   }
   try {
     const db = getDb();
-  const { verified, q, limit, offset } = req.query || {};
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const verified = url.searchParams.get("verified");
+    const q = url.searchParams.get("q");
+    const limit = url.searchParams.get("limit");
+    const offset = url.searchParams.get("offset");
     const params: any[] = [];
   let sql = `SELECT * FROM users`;
     const where: string[] = [];
-    if (typeof verified === "string") {
+    if (verified !== null) {
       if (verified === "true" || verified === "1") {
         where.push("is_verified = 1");
       } else if (verified === "false" || verified === "0") {
         where.push("is_verified = 0");
       }
     }
-    if (q && typeof q === "string" && q.trim()) {
+    if (q && q.trim()) {
       const term = `%${q.trim().toLowerCase()}%`;
       where.push("(LOWER(app_username) LIKE ? OR LOWER(leetcode_username) LIKE ? OR LOWER(user_id) LIKE ?)");
       params.push(term, term, term);
@@ -40,6 +44,7 @@ export default async function handler(req: any, res: any) {
     const result = await db.execute({ sql, args: params });
     return res.status(200).json({ ok: true, rows: result.rows ?? [] });
   } catch (err: any) {
+    console.error("/api/users error:", err);
     return res.status(500).json({ ok: false, error: err?.message || "Internal error" });
   }
 }
