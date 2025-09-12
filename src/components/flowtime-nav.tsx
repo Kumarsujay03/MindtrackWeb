@@ -6,6 +6,7 @@ import { FaBrain } from "react-icons/fa";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAdmin } from "@/features/Auth/useAdmin";
 import { useUserProfile } from "@/features/Auth/useUserProfile";
+import { useRegistrationStatus } from "@/features/Auth/useRegistrationStatus";
 
 export function AppNavigation({ settings }: settingsType) {
   const { user, loading } = useAuth();
@@ -14,7 +15,7 @@ export function AppNavigation({ settings }: settingsType) {
   const location = useLocation();
   const navigate = useNavigate();
   const isHome = location.pathname === "/";
-  const isVerified = !!user?.emailVerified;
+  const { isVerified } = useRegistrationStatus();
   return (
     <NavigationMenu className="w-full mb-2 max-w-none px-0 py-2">
       <div className="flex items-center w-full justify-between gap-3">

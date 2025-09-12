@@ -11,6 +11,7 @@ export type UserProfile = {
   dob?: string;
   leetcodeUsername?: string;
   gender?: string;
+  is_verified?: boolean;
 };
 
 export function useUserProfile() {
@@ -48,6 +49,7 @@ export function useUserProfile() {
             dob: d?.dob,
             leetcodeUsername: d?.leetcodeUsername,
             gender: d?.gender,
+            is_verified: d?.is_verified === true,
           });
         }
         setLoading(false);

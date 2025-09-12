@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@/features/Auth/AuthContext";
+import { useUserProfile } from "@/features/Auth/useUserProfile";
 
 function isAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false;
@@ -13,7 +14,9 @@ function isAdminEmail(email: string | null | undefined): boolean {
 
 export default function DashboardNav() {
   const { user } = useAuth();
+  const { profile } = useUserProfile();
   const admin = isAdminEmail(user?.email);
+  const isVerified = !!profile?.is_verified;
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     `px-4 py-2 rounded-md text-base sm:text-lg font-semibold border transition-colors ${
@@ -38,9 +41,11 @@ export default function DashboardNav() {
             Dashboard
           </NavLink>
         )}
-        <NavLink to="/questions" className={linkClass}>
-          Questions
-        </NavLink>
+        {isVerified && (
+          <NavLink to="/questions" className={linkClass}>
+            Questions
+          </NavLink>
+        )}
         <NavLink to="/leaderboard" className={linkClass}>
           Leaderboard
         </NavLink>

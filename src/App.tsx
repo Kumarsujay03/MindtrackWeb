@@ -16,6 +16,7 @@ import Questions from "@/pages/Questions";
 import Leaderboard from "@/pages/Leaderboard";
 import Profile from "@/pages/Profile";
 import UserTasks from "@/pages/UserTasks";
+import VerifiedRoute from "@/features/Auth/VerifiedRoute";
 
 function App() {
   const focusedTaskState = useState<TaskType | null>(null);
@@ -92,7 +93,16 @@ function App() {
                         </ProtectedRoute>
                       }
                     />
-                    <Route path="/questions" element={<Questions />} />
+                    <Route
+                      path="/questions"
+                      element={
+                        <ProtectedRoute>
+                          <VerifiedRoute>
+                            <Questions />
+                          </VerifiedRoute>
+                        </ProtectedRoute>
+                      }
+                    />
                     <Route path="/leaderboard" element={<Leaderboard />} />
                     <Route
                       path="/profile"
