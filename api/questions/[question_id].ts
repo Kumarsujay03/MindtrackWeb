@@ -1,13 +1,31 @@
-import { getDb } from "../_lib/db";
+import { getDb } from "../_lib/db.js";
+
+function setCors(res: any) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+}
 
 export default async function handler(req: any, res: any) {
+  setCors(res);
+  if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "GET") {
-    res.setHeader("Allow", "GET");
+    res.setHeader("Allow", "GET,OPTIONS");
     res.status(405).json({ ok: false, error: "Method Not Allowed" });
     return;
   }
   try {
-    const { question_id } = req.query || {};
+    const qFromReq = (req as any).query?.question_id;
+    let question_id: string | null = typeof qFromReq === "string" ? qFromReq : null;
+    if (!question_id) {
+      try {
+        const url = new URL(req.url, `http://${req.headers.host}`);
+        const parts = url.pathname.split("/").filter(Boolean);
+        question_id = parts[parts.length - 1] || null;
+      } catch {
+        // ignore
+      }
+    }
     if (!question_id) {
       res.status(400).json({ ok: false, error: "Missing question_id" });
       return;
@@ -35,6 +53,7 @@ export default async function handler(req: any, res: any) {
     }
     res.status(200).json({ ok: true, data: result.rows[0] });
   } catch (err: any) {
+    console.error("/api/questions/[question_id] error:", err);
     res.status(500).json({ ok: false, error: err?.message ?? "Internal error" });
   }
 }
