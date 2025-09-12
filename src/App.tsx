@@ -11,6 +11,11 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/features/Auth/AuthContext";
 import Dashboard from "@/pages/Dashboard";
 import ProtectedRoute from "@/features/Auth/ProtectedRoute";
+import AdminRoute from "@/features/Auth/AdminRoute";
+import Questions from "@/pages/Questions";
+import Leaderboard from "@/pages/Leaderboard";
+import Profile from "@/pages/Profile";
+import UserTasks from "@/pages/UserTasks";
 
 function App() {
   const focusedTaskState = useState<TaskType | null>(null);
@@ -27,11 +32,12 @@ function App() {
       <BrowserRouter>
         <AuthProvider>
           <Starfield intensity={settings.backgroundIntensity} />
-          <div className="fixed top-0 left-0 right-0 z-20 px-3 sm:px-6">
-            <AppNavigation settings={settings} />
-          </div>
-          <div className="relative z-10 min-h-svh sm:min-h-screen flex flex-col pt-16">
-            <div className="flex-1 flex flex-col items-center px-4">
+          <div className="relative z-10 h-svh sm:h-screen flex flex-col">
+            <div className="sticky top-0 z-40 px-3 sm:px-6 bg-black/20 supports-[backdrop-filter]:bg-black/30 backdrop-blur-md border-b border-white/10">
+              <AppNavigation settings={settings} />
+            </div>
+            <main className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+              <div className="flex flex-col items-center px-4">
               <div className="max-w-4xl w-full">
                 <div className="container max-w-4xl mx-auto">
                   <Routes>
@@ -72,14 +78,35 @@ function App() {
                       path="/dashboard"
                       element={
                         <ProtectedRoute>
-                          <Dashboard />
+                          <AdminRoute>
+                            <Dashboard />
+                          </AdminRoute>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/tasks"
+                      element={
+                        <ProtectedRoute>
+                          <UserTasks />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route path="/questions" element={<Questions />} />
+                    <Route path="/leaderboard" element={<Leaderboard />} />
+                    <Route
+                      path="/profile"
+                      element={
+                        <ProtectedRoute>
+                          <Profile />
                         </ProtectedRoute>
                       }
                     />
                   </Routes>
                 </div>
               </div>
-            </div>
+              </div>
+            </main>
             <div className="flex flex-col justify-center mb-8 space-x-4 items-center space-y-4">
               {/* Footer / social area */}
             </div>

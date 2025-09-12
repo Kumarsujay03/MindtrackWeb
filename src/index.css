@@ -138,6 +138,40 @@
   }
 }
 
+/* Themed, subtle scrollbars matching the glassy dark UI */
+.custom-scrollbar {
+  /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) transparent;
+}
+
+:root {
+  --scroll-thumb: rgba(0, 0, 0, 0.35);
+  --scroll-thumb-hover: rgba(0, 0, 0, 0.5);
+}
+.dark {
+  --scroll-thumb: rgba(255, 255, 255, 0.28);
+  --scroll-thumb-hover: rgba(255, 255, 255, 0.4);
+}
+
+/* WebKit-based browsers */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--scroll-thumb);
+  border-radius: 9999px;
+  border: 2px solid transparent; /* create inset look */
+  background-clip: padding-box;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scroll-thumb-hover);
+}
+
 /* Starfield background */
 .starfield {
   position: fixed;
