@@ -3,7 +3,6 @@ import { schema } from "../_lib/schema";
 import { parseJson, sendJson } from "../_lib/http";
 
 function getTable(req) {
-  // Expect path /api/crud?table=tasks
   const url = new URL(req.url, "http://localhost");
   const table = url.searchParams.get("table");
   return table;
