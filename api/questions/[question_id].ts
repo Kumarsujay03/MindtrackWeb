@@ -1,4 +1,11 @@
-import { getDb } from "../_lib/db.js";
+import * as DB from "../_lib/db.js";
+
+function getDbCompat() {
+  if (typeof (DB as any).getDb === "function") return (DB as any).getDb();
+  if (typeof (DB as any).getClient === "function") return (DB as any).getClient();
+  if ((DB as any).default && typeof (DB as any).default.getDb === "function") return (DB as any).default.getDb();
+  throw new Error("DB module does not export getDb or getClient");
+}
 
 function setCors(res: any) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -30,7 +37,7 @@ export default async function handler(req: any, res: any) {
       res.status(400).json({ ok: false, error: "Missing question_id" });
       return;
     }
-    const db = getDb();
+  const db = getDbCompat();
     const result = await db.execute({
       sql: `SELECT q.question_id, q.title, q.url, q.source, q.difficulty,
                    q.is_premium, q.acceptance_rate, q.frequency, q.description,

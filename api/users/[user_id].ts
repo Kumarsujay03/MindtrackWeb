@@ -1,4 +1,10 @@
-import { getDb } from "../_lib/db.js";
+import * as DB from "../_lib/db.js";
+function getDbCompat() {
+  if (typeof (DB as any).getDb === "function") return (DB as any).getDb();
+  if (typeof (DB as any).getClient === "function") return (DB as any).getClient();
+  if ((DB as any).default && typeof (DB as any).default.getDb === "function") return (DB as any).default.getDb();
+  throw new Error("DB module does not export getDb or getClient");
+}
 import { parseJson } from "../_lib/http.js";
 
 function setCors(res: any) {
@@ -14,7 +20,7 @@ export default async function handler(req: any, res: any) {
   if (!user_id || typeof user_id !== "string") {
     return res.status(400).json({ ok: false, error: "Missing user_id" });
   }
-  const db = getDb();
+  const db = getDbCompat();
   try {
     if (req.method === "GET") {
       const result = await db.execute({ sql: `SELECT * FROM users WHERE user_id = ?`, args: [user_id] });
