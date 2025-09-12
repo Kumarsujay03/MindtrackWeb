@@ -1,6 +1,15 @@
 import { getDb } from "../_lib/db";
+import { parseJson } from "../_lib/http.js";
+
+function setCors(res: any) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+}
 
 export default async function handler(req: any, res: any) {
+  setCors(res);
+  if (req.method === "OPTIONS") return res.status(204).end();
   const { user_id } = req.query || {};
   if (!user_id || typeof user_id !== "string") {
     return res.status(400).json({ ok: false, error: "Missing user_id" });
@@ -13,7 +22,8 @@ export default async function handler(req: any, res: any) {
       return res.status(200).json({ ok: true, row: result.rows[0] });
     }
     if (req.method === "POST" || req.method === "PATCH") {
-      const { is_verified, app_username, leetcode_username, clear_usernames } = req.body || {};
+      const body = await parseJson(req);
+      const { is_verified, app_username, leetcode_username, clear_usernames } = body || {};
       if (clear_usernames === true) {
         // Explicitly clear usernames and set unverified
         await db.execute({
