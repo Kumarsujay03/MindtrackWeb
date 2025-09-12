@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { apiFetch } from "@/lib/api";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, updateDoc, doc } from "firebase/firestore";
 
@@ -65,7 +66,7 @@ export default function Dashboard() {
       if (tursoUsersFilter === "unverified") params.set("verified", "false");
       if (tursoUsersQuery.trim()) params.set("q", tursoUsersQuery.trim());
       params.set("limit", "500");
-      const resp = await fetch(`/api/users?${params.toString()}`);
+  const resp = await apiFetch(`/api/users?${params.toString()}`);
       const data = await resp.json();
       if (resp.ok && data?.rows) setTursoUsersRows(data.rows);
     } catch {}
@@ -80,7 +81,7 @@ export default function Dashboard() {
   async function setTursoUserVerified(row: any, isVerified: boolean) {
     try {
       const user_id = (row as any)?.user_id ?? String(row?.uid ?? "");
-      await fetch(`/api/users/${encodeURIComponent(user_id)}`, {
+      await apiFetch(`/api/users/${encodeURIComponent(user_id)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -111,7 +112,7 @@ export default function Dashboard() {
       }
       // Mirror to Turso users table (authoritative)
       try {
-        await fetch(`/api/users/${encodeURIComponent(u.id)}`, {
+        await apiFetch(`/api/users/${encodeURIComponent(u.id)}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -131,7 +132,7 @@ export default function Dashboard() {
     try {
       await updateDoc(doc(db, "users", u.id), { is_verified: false });
       try {
-        await fetch(`/api/users/${encodeURIComponent(u.id)}`, {
+        await apiFetch(`/api/users/${encodeURIComponent(u.id)}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ is_verified: false }),
@@ -149,7 +150,7 @@ export default function Dashboard() {
     try {
       // Clear in Turso and set unverified
       try {
-        await fetch(`/api/users/${encodeURIComponent(u.id)}`, {
+        await apiFetch(`/api/users/${encodeURIComponent(u.id)}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ clear_usernames: true }),

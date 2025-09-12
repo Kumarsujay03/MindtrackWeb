@@ -25,21 +25,9 @@ export default function Leaderboard() {
         setAppUserName(d?.appUserName ?? "");
         setLeetcodeUsername(d?.leetcodeUsername ?? "");
         setHasProfile(true);
-        // Fetch SQL registration status
-        try {
-          const resp = await fetch(`/api/registrations/${user.uid}`);
-          if (resp.ok) {
-            const data = await resp.json();
-            setIsVerified(data?.status === "verified");
-            setIsRejected(data?.status === "rejected");
-          } else {
-            setIsVerified(!!d?.is_verified);
-            setIsRejected(false);
-          }
-        } catch {
-          setIsVerified(!!d?.is_verified);
-          setIsRejected(false);
-        }
+        // Use Firestore verification state for now
+        setIsVerified(!!d?.is_verified);
+        setIsRejected(false);
       } else {
         setHasProfile(false);
       }
@@ -67,26 +55,7 @@ export default function Leaderboard() {
     setError(null);
     setLoading(true);
     try {
-      // Call SQL-backed registrations API to create/update
-      const resp = await fetch(`/api/registrations`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          uid: user.uid,
-          display_name: user.displayName ?? null,
-          email: user.email ?? null,
-          avatar_url: user.photoURL ?? null,
-          app_username: app,
-          leetcode_username: lc,
-          status: "pending",
-        }),
-      });
-      if (!resp.ok) {
-        const j = await resp.json().catch(() => ({}));
-        throw new Error(j?.error || `Failed to apply (${resp.status})`);
-      }
-
-      // Also mirror minimal info into Firestore users/{uid}
+      // Save minimal info into Firestore users/{uid}
       const ref = doc(db, "users", user.uid);
       const payload = {
         appUserName: app,
@@ -109,15 +78,7 @@ export default function Leaderboard() {
       setError(err?.message || "Failed to apply. Try again.");
     } finally {
       setLoading(false);
-      // Refresh SQL registration status
-      try {
-        const r = await fetch(`/api/registrations/${user.uid}`);
-        if (r.ok) {
-          const d = await r.json();
-          setIsVerified(d?.status === "verified");
-          setHasProfile(true);
-        }
-      } catch {}
+      setHasProfile(true);
     }
   }
 
