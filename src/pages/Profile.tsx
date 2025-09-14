@@ -156,6 +156,24 @@ export default function Profile() {
           <Field label="LeetCode Username" value={profile.leetcodeUsername} />
           <Field label="Gender" value={profile.gender} />
         </div>
+
+        <div className="mt-6 flex items-center gap-3">
+          <a
+            href="/PrivacyPolicy.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
+            aria-label="Open Privacy Policy in a new tab"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M6 7a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H9a3 3 0 0 1-3-3V7z" stroke="currentColor" strokeWidth="2"/>
+              <path d="M9 7V6a2 2 0 0 1 2-2h6" stroke="currentColor" strokeWidth="2" opacity=".6"/>
+              <path d="M9 11h6M9 15h4" stroke="currentColor" strokeWidth="2"/>
+            </svg>
+            Privacy Policy
+          </a>
+          <span className="text-white/60 text-xs">Opens in a new tab</span>
+        </div>
       </div>
       {pickerOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
