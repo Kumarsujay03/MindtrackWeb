@@ -30,6 +30,7 @@ export default function Profile() {
   const [avatars, setAvatars] = useState<Array<{ name: string; url: string }>>([]);
   const [avatarsLoading, setAvatarsLoading] = useState(false);
   const [avatarsError, setAvatarsError] = useState<string | null>(null);
+  const [aboutOpen, setAboutOpen] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -156,7 +157,40 @@ export default function Profile() {
           <Field label="LeetCode Username" value={profile.leetcodeUsername} />
           <Field label="Gender" value={profile.gender} />
         </div>
-
+        <div className="mt-6 rounded-md border border-white/15 bg-white/5 overflow-hidden">
+          <button
+            type="button"
+            className="w-full flex items-center justify-between px-3 py-2 hover:bg-white/10"
+            aria-expanded={aboutOpen}
+            aria-controls="about-us-panel"
+            onClick={() => setAboutOpen((v) => !v)}
+          >
+            <span className="font-medium">About Us</span>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              className={`transition-transform ${aboutOpen ? 'rotate-180' : ''}`}
+            >
+              <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          {aboutOpen && (
+            <div id="about-us-panel" className="px-3 pb-3 pt-1 text-sm text-white/85">
+              <p>
+                MindTrack helps you stay focused, track your progress, and build better study and work habits. We combine simple tools with
+                thoughtful design to make consistency feel rewarding.
+              </p>
+              <p className="mt-2">
+                Questions or feedback? Reach us at
+                {' '}
+                <a href="mailto:reachus.mindtrack@gmail.com" className="text-primary hover:underline">reachus.mindtrack@gmail.com</a>.
+              </p>
+            </div>
+          )}
+        </div>
         <div className="mt-6 flex items-center gap-3">
           <a
             href="/PrivacyPolicy.html"
@@ -174,6 +208,9 @@ export default function Profile() {
           </a>
           <span className="text-white/60 text-xs">Opens in a new tab</span>
         </div>
+      </div>
+      <div className="mt-4 text-center text-xs text-white/60">
+        Made with <span role="img" aria-label="love">♥</span>
       </div>
       {pickerOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
