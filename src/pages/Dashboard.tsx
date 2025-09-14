@@ -394,30 +394,32 @@ export default function Dashboard() {
                 <div className="text-white/70 text-sm">
                   Showing {tursoRows.length ? tursoOffset + 1 : 0}–{tursoOffset + tursoRows.length} of {tursoTotal}
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    disabled={tursoOffset <= 0}
-                    onClick={() => {
-                      const next = Math.max(0, tursoOffset - tursoLimit);
-                      setTursoOffset(next);
-                      loadTurso({ offset: next });
-                    }}
-                    className="px-3 py-1.5 rounded-md bg-white/10 enabled:hover:bg-white/15 disabled:opacity-50"
-                  >
-                    Prev
-                  </button>
-                  <button
-                    disabled={tursoOffset + tursoLimit >= tursoTotal}
-                    onClick={() => {
-                      const next = tursoOffset + tursoLimit;
-                      setTursoOffset(next);
-                      loadTurso({ offset: next });
-                    }}
-                    className="px-3 py-1.5 rounded-md bg-white/10 enabled:hover:bg-white/15 disabled:opacity-50"
-                  >
-                    Next
-                  </button>
-                </div>
+                {tursoTotal > tursoLimit && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      disabled={tursoOffset <= 0}
+                      onClick={() => {
+                        const next = Math.max(0, tursoOffset - tursoLimit);
+                        setTursoOffset(next);
+                        loadTurso({ offset: next });
+                      }}
+                      className="px-3 py-1.5 rounded-md bg-white/10 enabled:hover:bg-white/15 disabled:opacity-50"
+                    >
+                      Prev
+                    </button>
+                    <button
+                      disabled={tursoOffset + tursoLimit >= tursoTotal}
+                      onClick={() => {
+                        const next = tursoOffset + tursoLimit;
+                        setTursoOffset(next);
+                        loadTurso({ offset: next });
+                      }}
+                      className="px-3 py-1.5 rounded-md bg-white/10 enabled:hover:bg-white/15 disabled:opacity-50"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
