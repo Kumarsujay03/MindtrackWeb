@@ -148,6 +148,31 @@ export default function Questions() {
   const canPrev = offset > 0;
   const canNext = offset + rows.length < total;
 
+  // Responsive visibility per column to avoid horizontal scroll
+  const colVisibility: Record<string, string> = useMemo(() => ({
+    // Keep core columns visible
+    is_starred: "", // always
+    title: "", // always
+    difficulty: "", // always
+    is_solved: "", // always
+
+    // Show ID on >= sm to save space on tiny screens
+    question_id: "hidden sm:table-cell",
+
+    // Secondary columns: show on medium and up
+    url: "hidden md:table-cell",
+    source: "hidden md:table-cell",
+    is_premium: "hidden lg:table-cell",
+
+    // Heavier columns: show on large and up
+    categories: "hidden lg:table-cell",
+    companies: "hidden lg:table-cell",
+
+    // Lowest priority: XL only
+    acceptance_rate: "hidden xl:table-cell",
+    frequency: "hidden xl:table-cell",
+  }), []);
+
   return (
     <div className="w-full px-2 sm:px-4 mt-6">
       <div className="glass-panel p-3 sm:p-4 rounded-lg">
@@ -338,12 +363,12 @@ export default function Questions() {
         ) : rows.length === 0 ? (
           <div className="text-white/70">No questions found.</div>
         ) : (
-          <div className="overflow-auto">
+          <div>
             <table className="w-full text-sm table-auto">
               <thead>
                 <tr className="text-left border-b border-white/10">
                   {displayCols.map((c) => (
-                    <th key={c} className="py-2 px-2 sm:px-3 capitalize whitespace-nowrap">
+                    <th key={c} className={`py-2 px-2 sm:px-3 capitalize whitespace-nowrap ${colVisibility[c] || ""}`}>
                       {c === "question_id"
                         ? "ID"
                         : c === "is_starred"
@@ -361,10 +386,11 @@ export default function Questions() {
                 {rows.map((r, idx) => (
                   <tr key={idx} className="border-b border-white/5">
                     {displayCols.map((k) => {
+                      const vis = colVisibility[k] || "";
                       const val = (r as any)[k];
                       if (k === "title") {
                         return (
-                          <td key={k} className="py-2 px-2 sm:px-3 align-top max-w-[420px]">
+                          <td key={k} className={`py-2 px-2 sm:px-3 align-top max-w-[220px] sm:max-w-[420px] ${vis}`}>
                             <div style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{String(val ?? "")}</div>
                           </td>
                         );
@@ -373,7 +399,7 @@ export default function Questions() {
                         const active = Number(val || 0) === 1;
                         const canToggle = Boolean(user);
                         return (
-                          <td key={k} className="py-2 px-2 sm:px-3 align-middle whitespace-nowrap">
+                          <td key={k} className={`py-2 px-2 sm:px-3 align-middle whitespace-nowrap ${vis}`}>
                             <button
                               disabled={!canToggle}
                               onClick={async () => {
@@ -403,7 +429,7 @@ export default function Questions() {
                         const active = Number(val || 0) === 1;
                         const canToggle = Boolean(user);
                         return (
-                          <td key={k} className="py-2 px-2 sm:px-3 align-top">
+                          <td key={k} className={`py-2 px-2 sm:px-3 align-top ${vis}`}>
                             <button
                               type="button"
                               disabled={!canToggle}
@@ -431,7 +457,7 @@ export default function Questions() {
                       }
                       if (k === "url" && r.url) {
                         return (
-                          <td key={k} className="py-2 px-2 sm:px-3 align-top">
+                          <td key={k} className={`py-2 px-2 sm:px-3 align-top ${vis}`}>
                             <a href={r.url} target="_blank" rel="noreferrer" title={r.url} className="text-blue-400 hover:underline">Link</a>
                           </td>
                         );
@@ -441,7 +467,7 @@ export default function Questions() {
                         const first = list[0];
                         const rest = list.slice(1);
                         return (
-                          <td key={k} className="py-2 px-2 sm:px-3 align-top">
+                          <td key={k} className={`py-2 px-2 sm:px-3 align-top ${vis}`}>
                             {list.length === 0 ? (
                               <span className="text-white/60">-</span>
                             ) : (
@@ -469,7 +495,7 @@ export default function Questions() {
                         const first = list[0];
                         const rest = list.slice(1);
                         return (
-                          <td key={k} className="py-2 px-2 sm:px-3 align-top">
+                          <td key={k} className={`py-2 px-2 sm:px-3 align-top ${vis}`}>
                             {list.length === 0 ? (
                               <span className="text-white/70">NA</span>
                             ) : (
@@ -500,12 +526,12 @@ export default function Questions() {
                         else if (v === 0 || v === "0" || v === false) text = "N";
                         else text = "";
                         return (
-                          <td key={k} className="py-2 px-2 sm:px-3 align-top">{text}</td>
+                          <td key={k} className={`py-2 px-2 sm:px-3 align-top ${vis}`}>{text}</td>
                         );
                       }
                       // Default render (blank for nullish)
                       return (
-                        <td key={k} className="py-2 px-2 sm:px-3 align-top">{val == null ? "" : String(val)}</td>
+                        <td key={k} className={`py-2 px-2 sm:px-3 align-top ${vis}`}>{val == null ? "" : String(val)}</td>
                       );
                     })}
                   </tr>

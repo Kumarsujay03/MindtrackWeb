@@ -253,7 +253,7 @@ export default function Dashboard() {
   }, [users, queryText]);
 
   return (
-    <div className="container max-w-5xl mx-auto">
+    <div className="mx-auto w-full max-w-none px-3 sm:px-4 md:px-6">
       <div className="flex flex-col gap-6">
         <h1 className="text-2xl font-semibold mt-4">Admin Dashboard</h1>
         {error && (
@@ -346,7 +346,7 @@ export default function Dashboard() {
             <div className="text-white/70">Loading…</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm table-auto">
                 <thead>
                   <tr className="text-left border-b border-white/10">
                     {(tursoColumns.length ? tursoColumns : Object.keys(tursoRows[0] || {})).map((c) => {
@@ -380,7 +380,7 @@ export default function Dashboard() {
                       return (
                         <tr key={idx} className="border-b border-white/5">
                           {keys.map((k) => (
-                            <td key={k} className="py-2 pr-3 max-w-[240px] truncate text-white/90">
+                            <td key={k} className="py-2 pr-3 min-w-0 max-w-[240px] truncate text-white/90">
                               {formatCell(row[k])}
                             </td>
                           ))}
@@ -441,7 +441,7 @@ export default function Dashboard() {
             <div className="text-white/70">Loading…</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm table-auto">
                 <thead>
                   <tr className="text-left border-b border-white/10">
                     <th className="py-2 pr-3">Name</th>
@@ -461,10 +461,10 @@ export default function Dashboard() {
                   ) : (
                     filtered.map((u) => (
                       <tr key={u.id} className="border-b border-white/5">
-                        <td className="py-2 pr-3 max-w-[240px] truncate">{u.name || "~"}</td>
-                        <td className="py-2 pr-3 max-w-[260px] truncate text-white/80">{u.email || ""}</td>
-                        <td className="py-2 pr-3">{u.appUserName || ""}</td>
-                        <td className="py-2 pr-3">{u.leetcodeUsername || ""}</td>
+                        <td className="py-2 pr-3 min-w-0 max-w-[240px] truncate">{u.name || "~"}</td>
+                        <td className="py-2 pr-3 min-w-0 max-w-[260px] truncate text-white/80">{u.email || ""}</td>
+                        <td className="py-2 pr-3 min-w-0 max-w-[200px] truncate">{u.appUserName || ""}</td>
+                        <td className="py-2 pr-3 min-w-0 max-w-[200px] truncate">{u.leetcodeUsername || ""}</td>
                         <td className="py-2 pr-3">{u.dob || "-"}</td>
                         <td className="py-2 pr-3">{u.is_verified ? <span className="text-green-400">Yes</span> : <span className="text-white/70">No</span>}</td>
                         <td className="py-2 pr-3">{(u as any).is_admin ? <span className="text-primary">Yes</span> : <span className="text-white/70">No</span>}</td>
