@@ -1,2 +1,3 @@
-# Exclude all serverless API routes from Vercel deployments
-api/**
+# (empty) Deploy all files. Do not exclude APIs.
+# Previously excluded:
+# api/**
