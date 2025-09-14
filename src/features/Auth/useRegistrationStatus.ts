@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { useAuth } from "@/features/Auth/AuthContext";
 import { useUserProfile } from "@/features/Auth/useUserProfile";
 
@@ -11,23 +10,15 @@ export type RegistrationRecord = {
 
 export function useRegistrationStatus() {
   const { user } = useAuth();
-  const { profile } = useUserProfile();
-  const [loading, setLoading] = useState<boolean>(!!user);
-  const [record, setRecord] = useState<RegistrationRecord | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { profile, loading: profileLoading } = useUserProfile();
 
-  useEffect(() => {
-    if (!user) {
-      setRecord(null);
-      setLoading(false);
-      return;
-    }
-    // Use Firestore profile only in this minimal setup
-    setLoading(false);
-    setError(null);
-    setRecord(profile?.is_verified ? { uid: user.uid, status: "verified" } as any : null);
-  }, [user, profile?.is_verified]);
-
+  // Drive loading off the Firestore profile subscription to avoid premature redirects
+  const loading = !!user && profileLoading;
   const isVerified = !!profile?.is_verified;
+  const record: RegistrationRecord | null = isVerified && user
+    ? { uid: user.uid, status: "verified" }
+    : null;
+  const error: string | null = null;
+
   return { loading, record, isVerified, error } as const;
 }

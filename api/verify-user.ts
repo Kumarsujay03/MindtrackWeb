@@ -46,8 +46,22 @@ export default async function handler(req: any, res: any) {
       easy_solved INTEGER NOT NULL DEFAULT 0,
       medium_solved INTEGER NOT NULL DEFAULT 0,
       hard_solved INTEGER NOT NULL DEFAULT 0,
-      total_solved INTEGER NOT NULL DEFAULT 0
+      total_solved INTEGER NOT NULL DEFAULT 0,
+      current_streak INTEGER NOT NULL DEFAULT 0,
+      longest_streak INTEGER NOT NULL DEFAULT 0,
+      last_solved_date NUMERIC
     )`);
+
+    // Backfill new columns for existing tables if missing
+    const pragma = await client.execute(`PRAGMA table_info(users)`);
+    const cols = new Set((pragma.rows || []).map((r: any) => (r.name as string)?.toLowerCase()));
+    const alters: string[] = [];
+    if (!cols.has("current_streak")) alters.push(`ALTER TABLE users ADD COLUMN current_streak INTEGER NOT NULL DEFAULT 0`);
+    if (!cols.has("longest_streak")) alters.push(`ALTER TABLE users ADD COLUMN longest_streak INTEGER NOT NULL DEFAULT 0`);
+    if (!cols.has("last_solved_date")) alters.push(`ALTER TABLE users ADD COLUMN last_solved_date NUMERIC`);
+    for (const sql of alters) {
+      try { await client.execute(sql); } catch {}
+    }
 
     // Uniqueness checks
     const conflicts = await client.execute({
@@ -67,8 +81,8 @@ export default async function handler(req: any, res: any) {
 
     // Upsert and mark verified
     await client.execute({
-      sql: `INSERT INTO users (user_id, app_username, leetcode_username, is_verified, easy_solved, medium_solved, hard_solved, total_solved)
-            VALUES (?, ?, ?, 1, 0, 0, 0, 0)
+      sql: `INSERT INTO users (user_id, app_username, leetcode_username, is_verified, easy_solved, medium_solved, hard_solved, total_solved, current_streak, longest_streak)
+            VALUES (?, ?, ?, 1, 0, 0, 0, 0, 0, 0)
             ON CONFLICT(user_id) DO UPDATE SET
               app_username = excluded.app_username,
               leetcode_username = excluded.leetcode_username,

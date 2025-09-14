@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, updateDoc, doc, serverTimestamp } from "firebase/firestore";
+import { collection, getDocs, query, updateDoc, doc, serverTimestamp, increment } from "firebase/firestore";
 import { useAuth } from "@/features/Auth/AuthContext";
 
 type UserRow = {
@@ -148,6 +148,7 @@ export default function Dashboard() {
             reason: (reason || "").trim() || null,
             at: serverTimestamp(),
           },
+          violationCount: increment(1),
         });
       }
       // Reload to ensure lists and counts are accurate
@@ -176,6 +177,7 @@ export default function Dashboard() {
           reason: (reason || "").trim() || null,
           at: serverTimestamp(),
         },
+        violationCount: increment(1),
       });
       await load();
     } catch (e: any) {
@@ -347,7 +349,7 @@ export default function Dashboard() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left border-b border-white/10">
-                    {(tursoColumns.length ? tursoColumns : Object.keys(tursoRows[0] || {})).slice(0, 8).map((c) => (
+                    {(tursoColumns.length ? tursoColumns : Object.keys(tursoRows[0] || {})).map((c) => (
                       <th key={c} className="py-2 pr-3 capitalize">{c}</th>
                     ))}
                   </tr>
@@ -361,7 +363,7 @@ export default function Dashboard() {
                     </tr>
                   ) : (
                     tursoRows.map((row, idx) => {
-                      const keys = (tursoColumns.length ? tursoColumns : Object.keys(row)).slice(0, 8);
+                      const keys = (tursoColumns.length ? tursoColumns : Object.keys(row));
                       return (
                         <tr key={idx} className="border-b border-white/5">
                           {keys.map((k) => (
@@ -434,13 +436,12 @@ export default function Dashboard() {
                     <th className="py-2 pr-3">DOB</th>
                     <th className="py-2 pr-3">Verified</th>
                     <th className="py-2 pr-3">Admin</th>
-                    <th className="py-2 pr-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr>
-                      <td className="py-3 text-white/70" colSpan={8}>No users match your search.</td>
+                      <td className="py-3 text-white/70" colSpan={7}>No users match your search.</td>
                     </tr>
                   ) : (
                     filtered.map((u) => (
@@ -452,15 +453,6 @@ export default function Dashboard() {
                         <td className="py-2 pr-3">{u.dob || "-"}</td>
                         <td className="py-2 pr-3">{u.is_verified ? <span className="text-green-400">Yes</span> : <span className="text-white/70">No</span>}</td>
                         <td className="py-2 pr-3">{(u as any).is_admin ? <span className="text-primary">Yes</span> : <span className="text-white/70">No</span>}</td>
-                        <td className="py-2 pr-3">
-                          <button
-                            disabled={busyId===u.id}
-                            onClick={() => toggleVerify(u)}
-                            className="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/15 text-white disabled:opacity-60"
-                          >
-                            {u.is_verified ? "Unverify" : "Verify"}
-                          </button>
-                        </td>
                       </tr>
                     ))
                   )}

@@ -38,9 +38,7 @@ function App() {
               <AppNavigation settings={settings} />
             </div>
             <main className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
-              <div className="flex flex-col items-center px-4">
-              <div className="max-w-4xl w-full">
-                <div className="container max-w-4xl mx-auto">
+              <div className="px-4">
                   <Routes>
                     <Route
                       path="/"
@@ -113,8 +111,6 @@ function App() {
                       }
                     />
                   </Routes>
-                </div>
-              </div>
               </div>
             </main>
             <div className="flex flex-col justify-center mb-8 space-x-4 items-center space-y-4">

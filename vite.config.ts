@@ -81,6 +81,124 @@ function devApiUsersPlugin(env: Record<string, string>): Plugin {
           res.end(JSON.stringify({ error: err?.message || "Database error" }));
         }
       });
+      server.middlewares.use("/api/questions", async (req, res) => {
+        try {
+          if (req.method !== "GET") {
+            res.statusCode = 405;
+            res.setHeader("Allow", "GET");
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ error: "Method Not Allowed" }));
+            return;
+          }
+
+          const dbUrl = env.TURSO_DATABASE_URL || process.env.TURSO_DATABASE_URL;
+          const dbToken = env.TURSO_AUTH_TOKEN || process.env.TURSO_AUTH_TOKEN;
+          if (!dbUrl || !dbToken) {
+            res.statusCode = 500;
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ error: "TURSO_DATABASE_URL or TURSO_AUTH_TOKEN not set" }));
+            return;
+          }
+          const client = createClient({ url: dbUrl, authToken: dbToken });
+
+          const full = new URL(req.url || "/api/questions", "http://localhost");
+          const limit = Math.max(1, Math.min(50, parseInt(full.searchParams.get("limit") || "50", 10)));
+          const offset = Math.max(0, parseInt(full.searchParams.get("offset") || "0", 10));
+          const q = (full.searchParams.get("q") || "").trim();
+          function getAll(name: string): string[] {
+            const vs = full.searchParams.getAll(name);
+            const out: string[] = [];
+            vs.forEach((s) => s.split(",").forEach((p) => { const t = p.trim(); if (t) out.push(t); }));
+            return out;
+          }
+          const categories = getAll("category");
+          const sheets = getAll("sheet");
+          const companies = getAll("company");
+          const difficulties = getAll("difficulty");
+
+          const desired = [
+            "question_id",
+            "title",
+            "url",
+            "source",
+            "difficulty",
+            "is_premium",
+            "acceptance_rate",
+            "frequency",
+          ];
+
+          const pragma = await client.execute(`PRAGMA table_info(questions)`);
+          const cols = new Set((pragma.rows || []).map((r: any) => String(r.name)));
+          if (!cols.size) {
+            res.statusCode = 404;
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ error: "Table 'questions' not found" }));
+            return;
+          }
+          const present = desired.filter((c) => cols.has(c));
+
+          const where: string[] = [];
+          const args: any[] = [];
+          if (q) {
+            where.push(`q.title LIKE ?`);
+            args.push(`%${q.replace(/%/g, "\\%").replace(/_/g, "\\_")}%`);
+          }
+          function splitIdsNames(arr: string[]): { ids: number[]; names: string[] } {
+            const ids: number[] = [];
+            const names: string[] = [];
+            arr.forEach((s) => { const n = Number(s); if (Number.isFinite(n) && String(n) === s) ids.push(n); else names.push(s); });
+            return { ids, names };
+          }
+          if (categories.length) {
+            const { ids, names } = splitIdsNames(categories);
+            const parts: string[] = [];
+            if (names.length) { parts.push(`c.name IN (${names.map(() => "?").join(",")})`); args.push(...names); }
+            if (ids.length) { parts.push(`c.category_id IN (${ids.map(() => "?").join(",")})`); args.push(...ids); }
+            if (parts.length) where.push(`EXISTS (SELECT 1 FROM question_categories qc JOIN categories c ON c.category_id = qc.category_id WHERE qc.question_id = q.question_id AND (${parts.join(" OR ")}))`);
+          }
+          if (sheets.length) {
+            const { ids, names } = splitIdsNames(sheets);
+            const parts: string[] = [];
+            if (names.length) { parts.push(`s.name IN (${names.map(() => "?").join(",")})`); args.push(...names); }
+            if (ids.length) { parts.push(`s.sheet_id IN (${ids.map(() => "?").join(",")})`); args.push(...ids); }
+            if (parts.length) where.push(`EXISTS (SELECT 1 FROM question_sheets qs JOIN sheets s ON s.sheet_id = qs.sheet_id WHERE qs.question_id = q.question_id AND (${parts.join(" OR ")}))`);
+          }
+          if (companies.length) {
+            const { ids, names } = splitIdsNames(companies);
+            const parts: string[] = [];
+            if (names.length) { parts.push(`co.name IN (${names.map(() => "?").join(",")})`); args.push(...names); }
+            if (ids.length) { parts.push(`co.company_id IN (${ids.map(() => "?").join(",")})`); args.push(...ids); }
+            if (parts.length) where.push(`EXISTS (SELECT 1 FROM question_companies qco JOIN companies co ON co.company_id = qco.company_id WHERE qco.question_id = q.question_id AND (${parts.join(" OR ")}))`);
+          }
+          if (difficulties.length) {
+            where.push(`q.difficulty IN (${difficulties.map(() => "?").join(",")})`);
+            args.push(...difficulties);
+          }
+          const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+
+          const countSql = `SELECT COUNT(DISTINCT q.question_id) AS cnt FROM questions q ${whereSql}`;
+          const countRes = await client.execute({ sql: countSql, args });
+          const total = Number((countRes.rows?.[0] as any)?.cnt || 0);
+
+          const baseCols = present.map((c) => `q."${c}"`).join(", ");
+          const selectList = [
+            baseCols,
+            `COALESCE((SELECT GROUP_CONCAT(DISTINCT c.name) FROM question_categories qc JOIN categories c ON c.category_id = qc.category_id WHERE qc.question_id = q.question_id), '') AS categories`,
+            `COALESCE((SELECT GROUP_CONCAT(DISTINCT co.name) FROM question_companies qco JOIN companies co ON co.company_id = qco.company_id WHERE qco.question_id = q.question_id), '') AS companies`,
+          ].join(", ");
+
+          const dataSql = `SELECT ${selectList} FROM questions q ${whereSql} ORDER BY q.question_id LIMIT ? OFFSET ?`;
+          const rowsRes = await client.execute({ sql: dataSql, args: [...args, limit, offset] });
+
+          res.statusCode = 200;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ ok: true, total, limit, offset, columns: [...present, "categories", "companies"], rows: rowsRes.rows }));
+        } catch (err: any) {
+          res.statusCode = 500;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ error: err?.message || "Database error" }));
+        }
+      });
       server.middlewares.use("/api/verify-user", async (req, res) => {
         try {
           if (req.method !== "POST") {
@@ -202,6 +320,90 @@ function devApiUsersPlugin(env: Record<string, string>): Plugin {
           res.statusCode = 200;
           res.setHeader("Content-Type", "application/json");
           res.end(JSON.stringify({ ok: true }));
+        } catch (err: any) {
+          res.statusCode = 500;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ error: err?.message || "Database error" }));
+        }
+      });
+      server.middlewares.use("/api/categories", async (req, res) => {
+        try {
+          if (req.method !== "GET") {
+            res.statusCode = 405;
+            res.setHeader("Allow", "GET");
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ error: "Method Not Allowed" }));
+            return;
+          }
+          const dbUrl = env.TURSO_DATABASE_URL || process.env.TURSO_DATABASE_URL;
+          const dbToken = env.TURSO_AUTH_TOKEN || process.env.TURSO_AUTH_TOKEN;
+          if (!dbUrl || !dbToken) {
+            res.statusCode = 500;
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ error: "TURSO_DATABASE_URL or TURSO_AUTH_TOKEN not set" }));
+            return;
+          }
+          const client = createClient({ url: dbUrl, authToken: dbToken });
+          const rows = await client.execute(`SELECT category_id, name FROM categories ORDER BY name`);
+          res.statusCode = 200;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ ok: true, rows: rows.rows }));
+        } catch (err: any) {
+          res.statusCode = 500;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ error: err?.message || "Database error" }));
+        }
+      });
+      server.middlewares.use("/api/sheets", async (req, res) => {
+        try {
+          if (req.method !== "GET") {
+            res.statusCode = 405;
+            res.setHeader("Allow", "GET");
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ error: "Method Not Allowed" }));
+            return;
+          }
+          const dbUrl = env.TURSO_DATABASE_URL || process.env.TURSO_DATABASE_URL;
+          const dbToken = env.TURSO_AUTH_TOKEN || process.env.TURSO_AUTH_TOKEN;
+          if (!dbUrl || !dbToken) {
+            res.statusCode = 500;
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ error: "TURSO_DATABASE_URL or TURSO_AUTH_TOKEN not set" }));
+            return;
+          }
+          const client = createClient({ url: dbUrl, authToken: dbToken });
+          const rows = await client.execute(`SELECT sheet_id, name, source FROM sheets ORDER BY name`);
+          res.statusCode = 200;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ ok: true, rows: rows.rows }));
+        } catch (err: any) {
+          res.statusCode = 500;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ error: err?.message || "Database error" }));
+        }
+      });
+      server.middlewares.use("/api/companies", async (req, res) => {
+        try {
+          if (req.method !== "GET") {
+            res.statusCode = 405;
+            res.setHeader("Allow", "GET");
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ error: "Method Not Allowed" }));
+            return;
+          }
+          const dbUrl = env.TURSO_DATABASE_URL || process.env.TURSO_DATABASE_URL;
+          const dbToken = env.TURSO_AUTH_TOKEN || process.env.TURSO_AUTH_TOKEN;
+          if (!dbUrl || !dbToken) {
+            res.statusCode = 500;
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ error: "TURSO_DATABASE_URL or TURSO_AUTH_TOKEN not set" }));
+            return;
+          }
+          const client = createClient({ url: dbUrl, authToken: dbToken });
+          const rows = await client.execute(`SELECT company_id, name FROM companies ORDER BY name`);
+          res.statusCode = 200;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ ok: true, rows: rows.rows }));
         } catch (err: any) {
           res.statusCode = 500;
           res.setHeader("Content-Type", "application/json");
