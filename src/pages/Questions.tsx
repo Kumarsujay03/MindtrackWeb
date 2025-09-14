@@ -7,6 +7,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/features/Auth/AuthContext";
 
 type Question = {
   question_id?: number;
@@ -19,6 +20,8 @@ type Question = {
   frequency?: number;
   categories?: string;
   companies?: string;
+  is_starred?: number;
+  is_solved?: number;
 };
 
 export default function Questions() {
@@ -37,6 +40,10 @@ export default function Questions() {
   const [sheets, setSheets] = useState<Array<{ sheet_id: number; name: string; source?: string }>>([]);
   const [companiesSelected, setCompaniesSelected] = useState<string[]>([]);
   const [companies, setCompanies] = useState<Array<{ company_id: number; name: string }>>([]);
+  const { user } = useAuth();
+  const [startedOnly, setStartedOnly] = useState<boolean>(false);
+  const [categoryFilter, setCategoryFilter] = useState<string>("");
+  const [companyFilter, setCompanyFilter] = useState<string>("");
 
   const difficultyOptions = useMemo(() => ["Easy", "Medium", "Hard"], []);
 
@@ -50,6 +57,8 @@ export default function Questions() {
   params.set("limit", String(limit));
   params.set("offset", String(offset));
   if (search.trim()) params.set("q", search.trim());
+  if (user?.uid) params.set("user_id", user.uid);
+  if (startedOnly && user?.uid) params.set("started", "1");
   categoriesSelected.forEach((c) => params.append("category", c));
   sheetsSelected.forEach((s) => params.append("sheet", s));
   companiesSelected.forEach((c) => params.append("company", c));
@@ -74,7 +83,7 @@ export default function Questions() {
       }
     })();
     return () => { cancelled = true; };
-  }, [offset, limit, search, categoriesSelected, sheetsSelected, companiesSelected, difficulty]);
+  }, [offset, limit, search, categoriesSelected, sheetsSelected, companiesSelected, difficulty, startedOnly, user?.uid]);
 
   // Load filter options
   useEffect(() => {
@@ -107,10 +116,29 @@ export default function Questions() {
   ]).filter(Boolean);
   const displayCols = (() => {
     const arr = [...baseCols];
+    // Place starred column immediately before question_id when both exist
+    const idxStar = arr.indexOf("is_starred");
+    const idxId = arr.indexOf("question_id");
+    if (idxStar !== -1 && idxId !== -1) {
+      arr.splice(idxStar, 1); // remove from current position
+      const newIdxId = arr.indexOf("question_id");
+      arr.splice(newIdxId, 0, "is_starred");
+    }
+    // Temporarily remove url to place near the end later
     const idxUrl = arr.indexOf("url");
-    if (idxUrl !== -1) {
-      arr.splice(idxUrl, 1);
-      arr.push("url");
+    const hadUrl = idxUrl !== -1;
+    if (hadUrl) arr.splice(idxUrl, 1);
+    // Ensure solved is last when present
+    const idxSolved = arr.indexOf("is_solved");
+    if (idxSolved !== -1) {
+      arr.splice(idxSolved, 1);
+      arr.push("is_solved");
+    }
+    // Place url either last (if no solved) or just before solved
+    if (hadUrl) {
+      const sIdx = arr.indexOf("is_solved");
+      if (sIdx !== -1) arr.splice(sIdx, 0, "url");
+      else arr.push("url");
     }
     return arr;
   })();
@@ -132,6 +160,16 @@ export default function Questions() {
             placeholder="Search title"
             className="px-3 py-2 rounded-md bg-white/5 border border-white/10 min-w-[220px]"
           />
+          <button
+            type="button"
+            disabled={!user}
+            onClick={() => { setOffset(0); setStartedOnly((v) => !v); }}
+            className={`inline-flex items-center justify-center h-10 w-10 rounded-md border transition-colors ${startedOnly ? "bg-amber-500/15 border-amber-400/30 text-amber-200" : "bg-white/5 border-white/10 text-white/80 hover:bg-white/10"} disabled:opacity-50`}
+            title={!user ? "Sign in to use Started filter" : "Toggle Started filter"}
+            aria-label="Toggle Started filter"
+          >
+            <span className={`${startedOnly ? "" : "opacity-90"} text-base leading-none`}>{startedOnly ? "★" : "☆"}</span>
+          </button>
           {/* Difficulty Dropdown (multi-select) */}
           <DropdownMenu>
             <DropdownMenuTrigger className="px-3 py-2 rounded-md bg-white/5 border border-white/10 text-left">
@@ -173,7 +211,22 @@ export default function Questions() {
             <DropdownMenuContent className="min-w-[240px] max-h-96 scrollbox">
               <DropdownMenuLabel>Select categories</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {categories.map((c) => (
+              <div className="px-2 pb-2">
+                <input
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  placeholder="Search categories"
+                  className="w-full px-2 py-1 rounded-md bg-white/5 border border-white/10"
+                />
+              </div>
+              {categories
+                .filter((c) =>
+                  categoryFilter.trim()
+                    ? c.name.toLowerCase().includes(categoryFilter.trim().toLowerCase())
+                    : true
+                )
+                .map((c) => (
                 <DropdownMenuCheckboxItem
                   key={c.category_id}
                   checked={categoriesSelected.includes(c.name)}
@@ -185,6 +238,13 @@ export default function Questions() {
                   {c.name}
                 </DropdownMenuCheckboxItem>
               ))}
+              {categories.filter((c) =>
+                categoryFilter.trim()
+                  ? c.name.toLowerCase().includes(categoryFilter.trim().toLowerCase())
+                  : true
+              ).length === 0 && (
+                <div className="px-3 py-2 text-sm text-white/60">No matches</div>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -229,7 +289,22 @@ export default function Questions() {
             <DropdownMenuContent className="min-w-[240px] max-h-96 scrollbox">
               <DropdownMenuLabel>Select companies</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {companies.map((c) => (
+              <div className="px-2 pb-2">
+                <input
+                  value={companyFilter}
+                  onChange={(e) => setCompanyFilter(e.target.value)}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  placeholder="Search companies"
+                  className="w-full px-2 py-1 rounded-md bg-white/5 border border-white/10"
+                />
+              </div>
+              {companies
+                .filter((c) =>
+                  companyFilter.trim()
+                    ? c.name.toLowerCase().includes(companyFilter.trim().toLowerCase())
+                    : true
+                )
+                .map((c) => (
                 <DropdownMenuCheckboxItem
                   key={c.company_id}
                   checked={companiesSelected.includes(c.name)}
@@ -241,10 +316,17 @@ export default function Questions() {
                   {c.name}
                 </DropdownMenuCheckboxItem>
               ))}
+              {companies.filter((c) =>
+                companyFilter.trim()
+                  ? c.name.toLowerCase().includes(companyFilter.trim().toLowerCase())
+                  : true
+              ).length === 0 && (
+                <div className="px-3 py-2 text-sm text-white/60">No matches</div>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
           <button
-            onClick={() => { setSearch(""); setCategoriesSelected([]); setSheetsSelected([]); setCompaniesSelected([]); setDifficulty([]); setOffset(0); }}
+            onClick={() => { setSearch(""); setCategoriesSelected([]); setSheetsSelected([]); setCompaniesSelected([]); setDifficulty([]); setStartedOnly(false); setOffset(0); }}
             className="px-3 py-2 rounded-md bg-white/10 hover:bg-white/15 border border-white/15"
           >
             Reset
@@ -261,7 +343,17 @@ export default function Questions() {
               <thead>
                 <tr className="text-left border-b border-white/10">
                   {displayCols.map((c) => (
-                    <th key={c} className="py-2 px-2 sm:px-3 capitalize whitespace-nowrap">{c.replace(/_/g, " ")}</th>
+                    <th key={c} className="py-2 px-2 sm:px-3 capitalize whitespace-nowrap">
+                      {c === "question_id"
+                        ? "ID"
+                        : c === "is_starred"
+                        ? "Starred"
+                        : c === "is_premium"
+                        ? "Premium"
+                        : c === "is_solved"
+                        ? "Solved"
+                        : c.replace(/_/g, " ")}
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -274,6 +366,66 @@ export default function Questions() {
                         return (
                           <td key={k} className="py-2 px-2 sm:px-3 align-top max-w-[420px]">
                             <div style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{String(val ?? "")}</div>
+                          </td>
+                        );
+                      }
+                      if (k === "is_starred") {
+                        const active = Number(val || 0) === 1;
+                        const canToggle = Boolean(user);
+                        return (
+                          <td key={k} className="py-2 px-2 sm:px-3 align-middle whitespace-nowrap">
+                            <button
+                              disabled={!canToggle}
+                              onClick={async () => {
+                                if (!user) return;
+                                const optimistic = !active ? 1 : 0;
+                                setRows((prev) => prev.map((row, i) => i === idx ? { ...row, is_starred: optimistic } : row));
+                                try {
+                                  const action = !active ? "star" : "unstar";
+                                  const res = await fetch("/api/progress", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: user.uid, question_id: r.question_id, action }) });
+                                  if (!res.ok) throw new Error(await res.text());
+                                } catch {
+                                  // revert on failure
+                                  setRows((prev) => prev.map((row, i) => i === idx ? { ...row, is_starred: active ? 1 : 0 } : row));
+                                }
+                              }}
+                              className={`inline-flex items-center justify-center p-0 bg-transparent border-0 cursor-pointer transition-colors disabled:opacity-50 ${active ? "text-amber-200" : "text-white/80 hover:text-white"}`}
+                              title={active ? "Started" : "Mark as started"}
+                              aria-label={active ? "Started" : "Mark as started"}
+                              style={{ lineHeight: 1 }}
+                            >
+                              <span className="text-base leading-none align-middle">{active ? "★" : "☆"}</span>
+                            </button>
+                          </td>
+                        );
+                      }
+                      if (k === "is_solved") {
+                        const active = Number(val || 0) === 1;
+                        const canToggle = Boolean(user);
+                        return (
+                          <td key={k} className="py-2 px-2 sm:px-3 align-top">
+                            <button
+                              type="button"
+                              disabled={!canToggle}
+                              onClick={async () => {
+                                if (!user) return;
+                                const optimistic = !active ? 1 : 0;
+                                setRows((prev) => prev.map((row, i) => i === idx ? { ...row, is_solved: optimistic } : row));
+                                try {
+                                  const action = !active ? "solve" : "unsolve";
+                                  const res = await fetch("/api/progress", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: user.uid, question_id: r.question_id, action }) });
+                                  if (!res.ok) throw new Error(await res.text());
+                                } catch {
+                                  // revert on failure
+                                  setRows((prev) => prev.map((row, i) => i === idx ? { ...row, is_solved: active ? 1 : 0 } : row));
+                                }
+                              }}
+                              className={`px-2 py-1 rounded-full text-xs border transition-colors ${active ? "bg-green-500/20 border-green-400/40 text-green-200" : "bg-white/5 border-white/10 text-white/80 hover:bg-white/10"}`}
+                              title={active ? "Solved" : "Mark as solved"}
+                            >
+                              <span className="mr-1">{active ? "✓" : "○"}</span>
+                              <span>{active ? "Done" : "Mark"}</span>
+                            </button>
                           </td>
                         );
                       }
@@ -340,8 +492,20 @@ export default function Questions() {
                           </td>
                         );
                       }
+                      // Special render for Premium as Y/N (blank if missing)
+                      if (k === "is_premium") {
+                        const v = val;
+                        let text = "";
+                        if (v === 1 || v === "1" || v === true) text = "Y";
+                        else if (v === 0 || v === "0" || v === false) text = "N";
+                        else text = "";
+                        return (
+                          <td key={k} className="py-2 px-2 sm:px-3 align-top">{text}</td>
+                        );
+                      }
+                      // Default render (blank for nullish)
                       return (
-                        <td key={k} className="py-2 px-2 sm:px-3 align-top">{String(val ?? "")}</td>
+                        <td key={k} className="py-2 px-2 sm:px-3 align-top">{val == null ? "" : String(val)}</td>
                       );
                     })}
                   </tr>

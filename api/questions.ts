@@ -29,6 +29,8 @@ export default async function handler(req: any, res: any) {
   const limit = Math.max(1, Math.min(50, parseInt((req.query.limit as string) || "50", 10)));
   const offset = Math.max(0, parseInt((req.query.offset as string) || "0", 10));
   const q = (req.query.q as string)?.trim() || ""; // title search
+  const user_id = ((req.query.user_id as string) || "").trim();
+  const startedOnly = ((req.query.started as string) || "") === "1";
   // Parse single or multiple values for filters; allow comma-separated or repeated params
   function getAll(name: string): string[] {
     const v = (req.query as any)[name];
@@ -101,6 +103,10 @@ export default async function handler(req: any, res: any) {
       where.push(`q.difficulty IN (${difficulties.map(() => "?").join(",")})`);
       args.push(...difficulties);
     }
+    if (startedOnly && user_id) {
+      where.push(`EXISTS (SELECT 1 FROM user_question_progress u WHERE u.user_id = ? AND u.question_id = q.question_id AND u.is_starred = 1)`);
+      args.push(user_id);
+    }
     const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
     // Count with filters (distinct by question)
@@ -110,16 +116,19 @@ export default async function handler(req: any, res: any) {
 
     // Select page with aggregated categories and companies
     const baseCols = present.map((c) => `q."${c}"`).join(", ");
+    const extraUserCols = user_id ? `, COALESCE(uqp.is_starred, 0) AS is_starred, COALESCE(uqp.is_solved, 0) AS is_solved` : "";
     const selectList = [
-      baseCols,
+      baseCols + extraUserCols,
       `COALESCE((SELECT GROUP_CONCAT(DISTINCT c.name) FROM question_categories qc JOIN categories c ON c.category_id = qc.category_id WHERE qc.question_id = q.question_id), '') AS categories`,
       `COALESCE((SELECT GROUP_CONCAT(DISTINCT co.name) FROM question_companies qco JOIN companies co ON co.company_id = qco.company_id WHERE qco.question_id = q.question_id), '') AS companies`,
     ].join(", ");
 
-    const dataSql = `SELECT ${selectList} FROM questions q ${whereSql} ORDER BY q.question_id LIMIT ? OFFSET ?`;
-    const rowsRes = await client.execute({ sql: dataSql, args: [...args, limit, offset] });
+    const fromSql = `FROM questions q` + (user_id ? ` LEFT JOIN user_question_progress uqp ON uqp.question_id = q.question_id AND uqp.user_id = ?` : ``);
+    const dataSql = `SELECT ${selectList} ${fromSql} ${whereSql} ORDER BY q.question_id LIMIT ? OFFSET ?`;
+    const dataArgs = user_id ? [user_id, ...args, limit, offset] : [...args, limit, offset];
+    const rowsRes = await client.execute({ sql: dataSql, args: dataArgs });
 
-    const columns = [...present, "categories", "companies"];
+    const columns = user_id ? [...present, "is_starred", "is_solved", "categories", "companies"] : [...present, "categories", "companies"];
     return res.status(200).json({ ok: true, total, limit, offset, columns, rows: rowsRes.rows as Row[] });
   } catch (e: any) {
     return res.status(500).json({ error: e?.message || "Database error" });

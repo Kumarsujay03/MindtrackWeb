@@ -316,7 +316,7 @@ export default function Dashboard() {
         {/* Turso DB Users table */}
         <section className="glass-panel p-4 rounded-lg">
           <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-            <h2 className="font-semibold">Users (Turso DB){tursoTotal ? ` — ${tursoTotal}` : ""}</h2>
+            <h2 className="font-semibold">Users (Turso DB)</h2>
             <div className="flex items-center gap-2">
               <input
                 value={tursoQuery}
@@ -349,9 +349,22 @@ export default function Dashboard() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left border-b border-white/10">
-                    {(tursoColumns.length ? tursoColumns : Object.keys(tursoRows[0] || {})).map((c) => (
-                      <th key={c} className="py-2 pr-3 capitalize">{c}</th>
-                    ))}
+                    {(tursoColumns.length ? tursoColumns : Object.keys(tursoRows[0] || {})).map((c) => {
+                      const map: Record<string, string> = {
+                        is_verified: "Verified",
+                        easy_solved: "Easy",
+                        medium_solved: "Medium",
+                        hard_solved: "Hard",
+                        total_solved: "Total",
+                        current_streak: "Streak",
+                        longest_streak: "Max_Streak",
+                        last_solved_date: "Last_solv_Date",
+                      };
+                      const label = map[c.toLowerCase?.() ? c.toLowerCase() : c] ?? c;
+                      return (
+                        <th key={c} className="py-2 pr-3 capitalize">{label}</th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody>
