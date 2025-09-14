@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/features/Auth/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, updateDoc, doc, addDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
+import { formatDateDMY } from "@/lib/utils";
 
 type Subtask = {
   id: string;
@@ -10,15 +11,15 @@ type Subtask = {
 };
 
 type UserTask = {
-  docId: string; // Firestore document id
-  id: string; // user-defined id field in document, fallback to docId
+  docId: string;
+  id: string;
   title: string;
   completed: boolean;
-  date?: string; // YYYY-MM-DD
+  date?: string;
   deadline?: string;
   notification?: boolean;
   reminders?: string[];
-  subtasks?: Subtask[]; // assumed shape in Firestore: array of { id, title, completed }
+  subtasks?: Subtask[];
 };
 
 export default function UserTasks() {
@@ -52,10 +53,8 @@ export default function UserTasks() {
               title: typeof s?.title === "string" ? s.title : "(untitled)",
               completed: !!s?.completed,
             }))
-            // Avoid pathological objects
             .filter((s: Subtask) => typeof s.title === "string");
           const subtasks = normalizedSubs;
-          // normalize reminders: prefer array of strings only
           const normReminders: string[] = Array.isArray(data?.reminders)
             ? (data.reminders as any[]).filter((r) => typeof r === "string")
             : [];
@@ -79,17 +78,15 @@ export default function UserTasks() {
     return () => unsub();
   }, [user]);
 
-  // Toggle: today vs all (sorted by deadline)
   const [view, setView] = useState<"today" | "all">("today");
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
   const displayTasks = useMemo(() => {
     const list = tasks ?? [];
     if (view === "today") {
-      // Show tasks scheduled for today or due today
       return list.filter((t) => (t.date ?? "") === todayStr || (t.deadline ?? "") === todayStr);
     }
-    // all: sort by deadline ascending; blanks go to the end. If equal blanks, sort by title
+  // Sort by deadline ascending; blanks go to end. If equal blanks, then by title
     const sorted = [...list].sort((a, b) => {
       const da = a.deadline || "";
       const dbs = b.deadline || "";
@@ -104,8 +101,7 @@ export default function UserTasks() {
   async function toggleComplete(t: UserTask) {
     if (!user) return;
     try {
-      // If marking task complete, mark all subtasks complete as well.
-      // If unmarking, keep subtasks as-is (user can toggle individually).
+  // Mark all subtasks if completing; keep as-is when unmarking.
       const nextCompleted = !t.completed;
       const patch: any = { completed: nextCompleted };
       if (nextCompleted && Array.isArray(t.subtasks) && t.subtasks.length > 0) {
@@ -124,8 +120,7 @@ export default function UserTasks() {
     if (subIndex < 0 || subIndex >= subs.length) return;
     subs[subIndex] = { ...subs[subIndex], completed: !subs[subIndex].completed };
     try {
-      // If any subtask is unchecked, task cannot be completed.
-      // If all subtasks are checked, mark task as completed.
+  // All checked => completed; any unchecked => not completed
       const allDone = subs.length > 0 && subs.every((s) => !!s.completed);
       await updateDoc(doc(db, "users", user.uid, "tasks", t.docId), { subtasks: subs, completed: allDone, updatedAt: serverTimestamp() });
     } catch (e) {
@@ -134,7 +129,6 @@ export default function UserTasks() {
     }
   }
 
-  // Delete a task
   async function deleteTask(t: UserTask) {
     if (!user) return;
     const ok = window.confirm(`Delete task "${t.title}"? This cannot be undone.`);
@@ -142,16 +136,13 @@ export default function UserTasks() {
     try {
       await deleteDoc(doc(db, "users", user.uid, "tasks", t.docId));
     } catch (e) {
-      // noop for now
     }
   }
 
-  // Edit modal
   const [editing, setEditing] = useState<UserTask | null>(null);
   const [draft, setDraft] = useState<Partial<UserTask>>({});
   const [draftSubtasks, setDraftSubtasks] = useState<Subtask[]>([]);
   const [isCreating, setIsCreating] = useState<boolean>(false);
-  // Modal reminders state (multiple entries as ISO-like strings YYYY-MM-DDTHH:mm)
   const [remindersState, setRemindersState] = useState<string[]>([]);
   const [newReminderDate, setNewReminderDate] = useState<string>("");
   const [newReminderTime, setNewReminderTime] = useState<string>("");
@@ -163,7 +154,7 @@ export default function UserTasks() {
       ? t.subtasks.map((s, idx) => ({ id: s.id ?? `${t.docId}-sub-${idx}`, title: s.title, completed: !!s.completed }))
       : [];
     setDraftSubtasks(subs);
-    // collect all reminders from task, ensure unique + sorted
+  // Collect reminders from task, ensure unique + sorted
     const fromTask = Array.isArray(t.reminders) ? t.reminders.filter((r) => typeof r === "string" && r.includes("T")) : [];
     const uniqueSorted = Array.from(new Set(fromTask)).sort();
     setRemindersState(uniqueSorted);
@@ -192,12 +183,11 @@ export default function UserTasks() {
     setNewReminderTime("");
   }
 
-  // Immediate persist helpers when editing existing task
   async function persistSubtasksForEditing(newSubs: Subtask[]) {
     if (!user || !editing) return;
-    // Apply completion rules
+  // Apply completion rules
     const allDone = newSubs.length > 0 && newSubs.every((s) => !!s.completed);
-    // If parent is set completed, ensure all subs done
+  // If parent is completed, ensure all subs done
     let completed = draft.completed ?? editing.completed ?? false;
     if (completed) {
       newSubs = newSubs.map((s) => ({ ...s, completed: true }));
@@ -234,7 +224,7 @@ export default function UserTasks() {
     const newSubs = [...draftSubtasks, newItem];
     setDraftSubtasks(newSubs);
     if (editing && user) {
-      // persist immediately
+  // Persist immediately
       void persistSubtasksForEditing(newSubs);
     }
   }
@@ -271,16 +261,15 @@ export default function UserTasks() {
 
   async function saveEdit() {
     if (!user || !editing) return;
-    // Use draftSubtasks
     const newSubtasks: Subtask[] = draftSubtasks.map((s, idx) => ({ id: s.id ?? `${editing.docId}-sub-${idx}`, title: s.title, completed: !!s.completed }));
-    // Completion sync: if task is checked, mark all subtasks done. Else, if subtasks exist, task reflects all-done status.
+  // If checked, mark all subtasks done; else reflect all-done status
     let completed = draft.completed ?? editing.completed;
     if (completed && newSubtasks.length > 0) {
       newSubtasks.forEach((s) => (s.completed = true));
     } else if (newSubtasks.length > 0) {
       completed = newSubtasks.every((s) => !!s.completed);
     }
-    // compute reminders to save based on modal state
+  // Compute reminders to save from modal state
     const notifEnabled = (draft.notification ?? editing.notification) ?? false;
     const finalReminders = notifEnabled ? Array.from(new Set(remindersState.filter(Boolean))).sort() : [];
     const payload: any = {
@@ -316,7 +305,7 @@ export default function UserTasks() {
     const payload: any = {
       title: draft.title ?? "(untitled)",
       completed,
-      // default date to today so it appears under Today tab
+  // Default date to today so it appears under Today tab
       date: new Date().toISOString().slice(0, 10),
       deadline: draft.deadline ?? "",
       notification: draft.notification ?? false,
@@ -391,8 +380,8 @@ export default function UserTasks() {
                     </div>
                   )}
                   <div className="text-xs text-white/60 mt-1">
-                    {t.date ? `Date: ${t.date}` : ""}
-                    {t.deadline ? (t.date ? " · " : "") + `Deadline: ${t.deadline}` : ""}
+                    {t.date ? `Date: ${formatDateDMY(t.date)}` : ""}
+                    {t.deadline ? (t.date ? " · " : "") + `Deadline: ${formatDateDMY(t.deadline)}` : ""}
                   </div>
                 </div>
                 <div className="flex items-center gap-3 self-center">
@@ -434,7 +423,7 @@ export default function UserTasks() {
           </ul>
         )}
       </div>
-      {/* Floating Add Button */}
+      
       <button
         className="fixed bottom-6 right-6 z-30 w-12 h-12 rounded-full bg-white text-black text-2xl leading-none flex items-center justify-center shadow-lg hover:bg-white/90 border border-white/20"
         title="Add task"
@@ -443,7 +432,7 @@ export default function UserTasks() {
       >
         +
       </button>
-      {/* Edit/Create Modal */}
+      
       {(editing || isCreating) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true">
           <div className="w-full max-w-lg rounded-lg border border-white/15 bg-black/80 backdrop-blur p-4">

@@ -24,7 +24,6 @@ export default function Leaderboard() {
   const [myAvatarUrl, setMyAvatarUrl] = useState<string | null>(null);
   const [avatarMap, setAvatarMap] = useState<Record<string, string | null>>({});
 
-  // Helpers: avatar initials and color
   function initials(name: string): string {
     const parts = name.trim().split(/\s+/).filter(Boolean);
     if (parts.length === 0) return "?";
@@ -70,7 +69,6 @@ export default function Leaderboard() {
     return () => unsub();
   }, [user]);
 
-  // Load leaderboard when verified or when paging changes
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -100,11 +98,9 @@ export default function Leaderboard() {
     return () => { cancelled = true; };
   }, [isVerified, lbLimit, lbOffset, user?.uid]);
 
-  // Load avatars for leaderboard rows from Firestore (activeProfileUrl)
   useEffect(() => {
     if (!lbRows.length) return;
     const ids = Array.from(new Set(lbRows.map((r) => r.user_id)));
-    // Chunk by up to 10 for Firestore 'in' queries
     const chunks: string[][] = [];
     for (let i = 0; i < ids.length; i += 10) chunks.push(ids.slice(i, i + 10));
     let cancelled = false;
@@ -118,9 +114,7 @@ export default function Leaderboard() {
             const data = d.data() as any;
             newMap[d.id] = (data?.activeProfileUrl ?? null) as string | null;
           });
-        } catch {
-          // ignore chunk failures
-        }
+        } catch {}
       }
       if (!cancelled) {
         setAvatarMap((prev) => ({ ...prev, ...newMap }));

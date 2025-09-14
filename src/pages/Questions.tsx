@@ -85,7 +85,6 @@ export default function Questions() {
     return () => { cancelled = true; };
   }, [offset, limit, search, categoriesSelected, sheetsSelected, companiesSelected, difficulty, startedOnly, user?.uid]);
 
-  // Load filter options
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -110,31 +109,26 @@ export default function Questions() {
     return () => { cancelled = true; };
   }, []);
 
-  // Build display columns, ensuring URL appears as the last column
   const baseCols = (columns.length ? columns : [
     "question_id","title","url","source","difficulty","is_premium","acceptance_rate","frequency","categories","companies"
   ]).filter(Boolean);
   const displayCols = (() => {
     const arr = [...baseCols];
-    // Place starred column immediately before question_id when both exist
     const idxStar = arr.indexOf("is_starred");
     const idxId = arr.indexOf("question_id");
     if (idxStar !== -1 && idxId !== -1) {
-      arr.splice(idxStar, 1); // remove from current position
+      arr.splice(idxStar, 1);
       const newIdxId = arr.indexOf("question_id");
       arr.splice(newIdxId, 0, "is_starred");
     }
-    // Temporarily remove url to place near the end later
     const idxUrl = arr.indexOf("url");
     const hadUrl = idxUrl !== -1;
     if (hadUrl) arr.splice(idxUrl, 1);
-    // Ensure solved is last when present
     const idxSolved = arr.indexOf("is_solved");
     if (idxSolved !== -1) {
       arr.splice(idxSolved, 1);
       arr.push("is_solved");
     }
-    // Place url either last (if no solved) or just before solved
     if (hadUrl) {
       const sIdx = arr.indexOf("is_solved");
       if (sIdx !== -1) arr.splice(sIdx, 0, "url");
@@ -148,27 +142,21 @@ export default function Questions() {
   const canPrev = offset > 0;
   const canNext = offset + rows.length < total;
 
-  // Responsive visibility per column to avoid horizontal scroll
   const colVisibility: Record<string, string> = useMemo(() => ({
-    // Keep core columns visible
-    is_starred: "", // always
-    title: "", // always
-    difficulty: "", // always
-    is_solved: "", // always
+    is_starred: "",
+    title: "",
+    difficulty: "",
+    is_solved: "",
 
-    // Show ID on >= sm to save space on tiny screens
     question_id: "hidden sm:table-cell",
 
-    // Secondary columns: show on medium and up
     url: "hidden md:table-cell",
     source: "hidden md:table-cell",
     is_premium: "hidden lg:table-cell",
 
-    // Heavier columns: show on large and up
     categories: "hidden lg:table-cell",
     companies: "hidden lg:table-cell",
 
-    // Lowest priority: XL only
     acceptance_rate: "hidden xl:table-cell",
     frequency: "hidden xl:table-cell",
   }), []);
@@ -177,7 +165,7 @@ export default function Questions() {
     <div className="w-full px-2 sm:px-4 mt-6">
       <div className="glass-panel p-3 sm:p-4 rounded-lg">
         <h2 className="text-xl font-semibold mb-3">Questions</h2>
-        {/* Filters */}
+        
         <div className="flex flex-wrap items-center gap-2 mb-3">
           <input
             value={search}
@@ -195,7 +183,7 @@ export default function Questions() {
           >
             <span className={`${startedOnly ? "" : "opacity-90"} text-base leading-none`}>{startedOnly ? "★" : "☆"}</span>
           </button>
-          {/* Difficulty Dropdown (multi-select) */}
+          
           <DropdownMenu>
             <DropdownMenuTrigger className="px-3 py-2 rounded-md bg-white/5 border border-white/10 text-left">
               <div className="flex items-center gap-2">
@@ -223,7 +211,7 @@ export default function Questions() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Categories Dropdown (multi-select) */}
+          
           <DropdownMenu>
             <DropdownMenuTrigger className="px-3 py-2 rounded-md bg-white/5 border border-white/10 text-left">
               <div className="flex items-center gap-2">
@@ -273,7 +261,7 @@ export default function Questions() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Sheets Dropdown (multi-select) */}
+          
           <DropdownMenu>
             <DropdownMenuTrigger className="px-3 py-2 rounded-md bg-white/5 border border-white/10 text-left">
               <div className="flex items-center gap-2">
@@ -301,7 +289,7 @@ export default function Questions() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Companies Dropdown (multi-select) */}
+          
           <DropdownMenu>
             <DropdownMenuTrigger className="px-3 py-2 rounded-md bg-white/5 border border-white/10 text-left">
               <div className="flex items-center gap-2">
@@ -411,7 +399,7 @@ export default function Questions() {
                                   const res = await fetch("/api/progress", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: user.uid, question_id: r.question_id, action }) });
                                   if (!res.ok) throw new Error(await res.text());
                                 } catch {
-                                  // revert on failure
+                                  
                                   setRows((prev) => prev.map((row, i) => i === idx ? { ...row, is_starred: active ? 1 : 0 } : row));
                                 }
                               }}
@@ -442,7 +430,7 @@ export default function Questions() {
                                   const res = await fetch("/api/progress", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: user.uid, question_id: r.question_id, action }) });
                                   if (!res.ok) throw new Error(await res.text());
                                 } catch {
-                                  // revert on failure
+                                  
                                   setRows((prev) => prev.map((row, i) => i === idx ? { ...row, is_solved: active ? 1 : 0 } : row));
                                 }
                               }}
@@ -518,7 +506,7 @@ export default function Questions() {
                           </td>
                         );
                       }
-                      // Special render for Premium as Y/N (blank if missing)
+                      
                       if (k === "is_premium") {
                         const v = val;
                         let text = "";
@@ -529,7 +517,7 @@ export default function Questions() {
                           <td key={k} className={`py-2 px-2 sm:px-3 align-top ${vis}`}>{text}</td>
                         );
                       }
-                      // Default render (blank for nullish)
+                      
                       return (
                         <td key={k} className={`py-2 px-2 sm:px-3 align-top ${vis}`}>{val == null ? "" : String(val)}</td>
                       );

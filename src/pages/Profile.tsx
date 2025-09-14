@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/features/Auth/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, doc, getDoc, query, where, getDocs, updateDoc, serverTimestamp } from "firebase/firestore";
+import { formatDateDMY } from "@/lib/utils";
 
 type ProfileData = {
   activeProfileUrl: string | null;
   email: string | null;
   name: string | null;
-  appUserName: string; // default '~'
-  dob: string; // YYYY-MM-DD or ''
+  appUserName: string;
+  dob: string;
   leetcodeUsername: string;
   gender: string;
 };
@@ -37,7 +38,6 @@ export default function Profile() {
         return;
       }
       try {
-        // Try user doc by UID first, then fallback to email.
         const byUidRef = user.uid ? doc(db, "users", user.uid) : null;
         const snap = byUidRef ? await getDoc(byUidRef) : null;
         let data: any | null = null;
@@ -59,7 +59,6 @@ export default function Profile() {
           gender: data?.gender ?? "",
         });
       } catch (e) {
-        // Fallback to auth user only
         setProfile({
           activeProfileUrl: user?.photoURL ?? null,
           email: user?.email ?? null,
@@ -80,7 +79,6 @@ export default function Profile() {
     setAvatarsLoading(true);
     setAvatarsError(null);
     try {
-      // Read the single known document under 'assests' that contains all avatar URLs
       const ref = doc(db, "assests", AVATAR_ASSETS_DOC_ID);
       const snap = await getDoc(ref);
       if (!snap.exists()) throw new Error("Avatar catalog not found");
@@ -91,7 +89,6 @@ export default function Profile() {
           list.push({ name: k, url: v });
         }
       });
-      // Deduplicate by name
       const seen = new Set<string>();
       const dedup = list.filter((a) => (seen.has(a.name) ? false : (seen.add(a.name), true)));
       setAvatars(dedup);
@@ -113,7 +110,6 @@ export default function Profile() {
       setProfile((p) => ({ ...p, activeProfileUrl: a.url }));
       setPickerOpen(false);
     } catch (e) {
-      // silent fail in UI; could add toast
     }
   }
 
@@ -142,7 +138,6 @@ export default function Profile() {
               className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-primary text-black shadow border border-white/20 hover:opacity-90"
               title="Change avatar"
             >
-              {/* pencil icon */}
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" fill="currentColor"/>
                 <path d="M20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z" fill="currentColor"/>
@@ -157,7 +152,7 @@ export default function Profile() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="App Username" value={profile.appUserName} />
-          <Field label="DOB (YYYY-MM-DD)" value={profile.dob} />
+          <Field label="DOB (DD-MM-YYYY)" value={formatDateDMY(profile.dob)} />
           <Field label="LeetCode Username" value={profile.leetcodeUsername} />
           <Field label="Gender" value={profile.gender} />
         </div>

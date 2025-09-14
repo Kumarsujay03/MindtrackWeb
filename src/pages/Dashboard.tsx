@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { db } from "@/lib/firebase";
+import { formatDateDMY } from "@/lib/utils";
 import { collection, getDocs, query, updateDoc, doc, serverTimestamp, increment } from "firebase/firestore";
 import { useAuth } from "@/features/Auth/AuthContext";
 
@@ -20,7 +21,6 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [queryText, setQueryText] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
-  // Turso Users table state
   const [tursoLoading, setTursoLoading] = useState<boolean>(false);
   const [tursoError, setTursoError] = useState<string | null>(null);
   const [tursoRows, setTursoRows] = useState<any[]>([]);
@@ -29,23 +29,19 @@ export default function Dashboard() {
   const [tursoLimit, setTursoLimit] = useState<number>(50);
   const [tursoOffset, setTursoOffset] = useState<number>(0);
   const [tursoQuery, setTursoQuery] = useState<string>("");
-  // Removed Turso registrations section in favor of direct users table management
-
-  // Turso section removed
+  
 
   async function load() {
     setLoading(true);
     setError(null);
     try {
-      // NOTE: This requires Firestore rules to allow admins to list users.
-      // If your rules block list reads, we will show a message below.
       const q = query(collection(db, "users"));
       const snap = await getDocs(q);
       const rows: UserRow[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
       rows.sort((a, b) => {
         const av = a.is_verified ? 1 : 0;
         const bv = b.is_verified ? 1 : 0;
-        if (av !== bv) return bv - av; // verified first
+  if (av !== bv) return bv - av;
         return (a.appUserName || "").localeCompare(b.appUserName || "");
       });
       setUsers(rows);
@@ -94,7 +90,6 @@ export default function Dashboard() {
   }
 
   useEffect(() => {
-    // initial load of turso table
     loadTurso({ offset: 0 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -103,13 +98,11 @@ export default function Dashboard() {
     try {
       setBusyId(u.id);
       if (!u.is_verified) {
-        // Verifying: require both usernames
         const app = (u.appUserName || "").trim();
         const lc = (u.leetcodeUsername || "").trim();
         if (!app || !lc) {
           throw new Error("App username and LeetCode username are required to verify");
         }
-        // 1) Call API to upsert Turso user and enforce uniqueness
         const resp = await fetch("/api/verify-user", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -121,7 +114,6 @@ export default function Dashboard() {
         try { payload = JSON.parse(raw || "{}"); } catch {}
         if (!payload?.ok) throw new Error(payload?.error || "Failed to verify user in Turso");
 
-        // 2) Update Firestore (save usernames and verified flag)
         await updateDoc(doc(db, "users", u.id), {
           is_verified: true,
           appUserName: app,
@@ -134,7 +126,6 @@ export default function Dashboard() {
           },
         });
       } else {
-        // Unverify only affects Firestore per current requirement
         const reason = window.prompt("Reason for un-verifying this user?", "Violation of rules / incorrect usernames");
         await updateDoc(doc(db, "users", u.id), {
           is_verified: false,
@@ -151,7 +142,6 @@ export default function Dashboard() {
           violationCount: increment(1),
         });
       }
-      // Reload to ensure lists and counts are accurate
       await load();
     } catch (e: any) {
       alert(e?.message || "Failed to update");
@@ -194,17 +184,14 @@ export default function Dashboard() {
     try {
       setBusyId(u.id);
       const reason = window.prompt("Reason for deleting this application?", "Invalid or duplicate usernames / other");
-      // Also delete from Turso users table
       try {
         const resp = await fetch("/api/delete-user", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ user_id: u.id }),
         });
-        // read text then ignore errors (not blocking Firestore cleanup)
         await resp.text();
       } catch {}
-      // Clear in Firestore so the user must apply again
       await updateDoc(doc(db, "users", u.id), {
         appUserName: null,
         leetcodeUsername: null,
@@ -220,7 +207,6 @@ export default function Dashboard() {
           at: serverTimestamp(),
         },
       });
-      // Optimistic update: clear immediately
       setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, appUserName: null, leetcodeUsername: null, is_verified: false } : x)));
       await load();
     } catch (e: any) {
@@ -230,8 +216,6 @@ export default function Dashboard() {
       setBusyId(null);
     }
   }
-
-  // reject/delete application flows removed
 
   function nonEmpty(s: string | null | undefined) {
     return typeof s === "string" && s.trim().length > 0;
@@ -313,7 +297,7 @@ export default function Dashboard() {
           </section>
         </div>
 
-        {/* Turso DB Users table */}
+        
         <section className="glass-panel p-4 rounded-lg">
           <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
             <h2 className="font-semibold">Users (Turso DB)</h2>
@@ -379,11 +363,14 @@ export default function Dashboard() {
                       const keys = (tursoColumns.length ? tursoColumns : Object.keys(row));
                       return (
                         <tr key={idx} className="border-b border-white/5">
-                          {keys.map((k) => (
-                            <td key={k} className="py-2 pr-3 min-w-0 max-w-[240px] truncate text-white/90">
-                              {formatCell(row[k])}
-                            </td>
-                          ))}
+                          {keys.map((k) => {
+                            const kl = (typeof k === "string" && (k as string).toLowerCase) ? (k as string).toLowerCase() : String(k).toLowerCase();
+                            const isDateCol = kl.includes("date") || kl.endsWith("_at") || kl === "created" || kl === "updated" || kl.endsWith("date_at");
+                            const value = isDateCol ? formatDateDMY(row[k]) : formatCell(row[k]);
+                            return (
+                              <td key={k} className="py-2 pr-3 min-w-0 max-w-[240px] truncate text-white/90">{value}</td>
+                            );
+                          })}
                         </tr>
                       );
                     })
@@ -465,7 +452,7 @@ export default function Dashboard() {
                         <td className="py-2 pr-3 min-w-0 max-w-[260px] truncate text-white/80">{u.email || ""}</td>
                         <td className="py-2 pr-3 min-w-0 max-w-[200px] truncate">{u.appUserName || ""}</td>
                         <td className="py-2 pr-3 min-w-0 max-w-[200px] truncate">{u.leetcodeUsername || ""}</td>
-                        <td className="py-2 pr-3">{u.dob || "-"}</td>
+                        <td className="py-2 pr-3">{formatDateDMY((u as any).dob)}</td>
                         <td className="py-2 pr-3">{u.is_verified ? <span className="text-green-400">Yes</span> : <span className="text-white/70">No</span>}</td>
                         <td className="py-2 pr-3">{(u as any).is_admin ? <span className="text-primary">Yes</span> : <span className="text-white/70">No</span>}</td>
                       </tr>
@@ -477,7 +464,7 @@ export default function Dashboard() {
           )}
         </section>
 
-        {/* Turso section removed */}
+        
       </div>
     </div>
   );
@@ -489,7 +476,6 @@ function formatCell(v: any) {
   if (typeof v === "number") return String(v);
   if (v instanceof Date) return v.toISOString();
   try {
-    // stringify objects/arrays safely but compact
     if (typeof v === "object") return JSON.stringify(v);
   } catch {}
   return String(v);
