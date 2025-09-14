@@ -335,7 +335,7 @@ export default function UserTasks() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto w-full px-4">
+    <div className="max-w-4xl mx-auto w-full px-4 mt-6">
       <div className="glass-panel p-4 rounded-lg">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xl font-semibold">Tasks</h2>

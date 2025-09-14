@@ -204,7 +204,7 @@ export default function Leaderboard() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto w-150 px-4">
+  <div className="max-w-4xl mx-auto w-150 px-4 mt-6">
       <div className="glass-panel p-4 rounded-lg">
         <h2 className="text-xl font-semibold mb-2">Leaderboard</h2>
 

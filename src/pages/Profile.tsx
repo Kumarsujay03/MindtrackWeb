@@ -118,7 +118,7 @@ export default function Profile() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto w-full px-4">
+  <div className="max-w-4xl mx-auto w-full px-4 mt-6">
       <div className="glass-panel p-4 rounded-lg">
         <h2 className="text-xl font-semibold mb-4">Profile</h2>
 

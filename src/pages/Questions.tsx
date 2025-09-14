@@ -149,7 +149,7 @@ export default function Questions() {
   const canNext = offset + rows.length < total;
 
   return (
-    <div className="w-full px-2 sm:px-4">
+    <div className="w-full px-2 sm:px-4 mt-6">
       <div className="glass-panel p-3 sm:p-4 rounded-lg">
         <h2 className="text-xl font-semibold mb-3">Questions</h2>
         {/* Filters */}
