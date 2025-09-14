@@ -152,20 +152,19 @@ export default function Leaderboard() {
       if (lcTaken) throw new Error("LeetCode username is already taken.");
 
       const ref = doc(db, "users", user.uid);
-      const payload = {
+      const updatePayload = {
         appUserName: app,
         leetcodeUsername: lc,
         is_verified: false,
         name: user.displayName ?? null,
         email: user.email ?? null,
         updatedAt: serverTimestamp(),
-        createdAt: serverTimestamp(),
-      } as any;
+      } as const;
       const existing = await getDoc(ref);
       if (existing.exists()) {
-        await updateDoc(ref, payload);
+        await updateDoc(ref, updatePayload as any);
       } else {
-        await setDoc(ref, payload);
+        await setDoc(ref, { ...updatePayload, createdAt: serverTimestamp() } as any, { merge: true });
       }
       setSubmitted(true);
       setReapplyMode(false);
