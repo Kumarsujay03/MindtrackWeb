@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { apiFetch } from "@/lib/api";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, updateDoc, doc } from "firebase/firestore";
 
@@ -20,11 +19,7 @@ export default function Dashboard() {
   const [queryText, setQueryText] = useState("");
   // Removed Turso registrations section in favor of direct users table management
 
-  // Turso Users (users table) state
-  const [tursoUsersRows, setTursoUsersRows] = useState<any[]>([]);
-  const [tursoUsersLoading, setTursoUsersLoading] = useState<boolean>(false);
-  const [tursoUsersFilter, setTursoUsersFilter] = useState<"all" | "verified" | "unverified">("all");
-  const [tursoUsersQuery, setTursoUsersQuery] = useState<string>("");
+  // Turso section removed
 
   async function load() {
     setLoading(true);
@@ -57,42 +52,9 @@ export default function Dashboard() {
 
   // Removed registrations verify flow; we only manage users table directly now.
 
-  // Load Turso users (users table)
-  async function loadTursoUsers() {
-    setTursoUsersLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (tursoUsersFilter === "verified") params.set("verified", "true");
-      if (tursoUsersFilter === "unverified") params.set("verified", "false");
-      if (tursoUsersQuery.trim()) params.set("q", tursoUsersQuery.trim());
-      params.set("limit", "500");
-  const resp = await apiFetch(`/api/users?${params.toString()}`);
-      const data = await resp.json();
-      if (resp.ok && data?.rows) setTursoUsersRows(data.rows);
-    } catch {}
-    setTursoUsersLoading(false);
-  }
+  // Turso load removed
 
-  useEffect(() => {
-    loadTursoUsers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tursoUsersFilter]);
-
-  async function setTursoUserVerified(row: any, isVerified: boolean) {
-    try {
-      const user_id = (row as any)?.user_id ?? String(row?.uid ?? "");
-      await apiFetch(`/api/users/${encodeURIComponent(user_id)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          is_verified: isVerified,
-          app_username: (row as any)?.app_username,
-          leetcode_username: (row as any)?.leetcode_username,
-        }),
-      });
-      await loadTursoUsers();
-    } catch {}
-  }
+  // Removed write actions for Turso table; read-only view
 
   // Removed registrations reject; not applicable.
 
@@ -110,18 +72,7 @@ export default function Dashboard() {
       } else {
         await updateDoc(doc(db, "users", u.id), { is_verified: false });
       }
-      // Mirror to Turso users table (authoritative)
-      try {
-        await apiFetch(`/api/users/${encodeURIComponent(u.id)}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            is_verified: !u.is_verified,
-            app_username: u.appUserName,
-            leetcode_username: u.leetcodeUsername,
-          }),
-        });
-      } catch {}
+      // Removed Turso mirror (serverless API deleted)
       setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, is_verified: !u.is_verified } : x)));
     } catch (e: any) {
       alert(e?.message || "Failed to update");
@@ -131,13 +82,7 @@ export default function Dashboard() {
   async function setUnverified(u: UserRow) {
     try {
       await updateDoc(doc(db, "users", u.id), { is_verified: false });
-      try {
-        await apiFetch(`/api/users/${encodeURIComponent(u.id)}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ is_verified: false }),
-        });
-      } catch {}
+      // Removed Turso mirror (serverless API deleted)
       setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, is_verified: false } : x)));
     } catch (e: any) {
       alert(e?.message || "Failed to unverify user");
@@ -148,14 +93,7 @@ export default function Dashboard() {
     const confirmDelete = window.confirm("Delete this application? This clears usernames and keeps user unverified.");
     if (!confirmDelete) return;
     try {
-      // Clear in Turso and set unverified
-      try {
-        await apiFetch(`/api/users/${encodeURIComponent(u.id)}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ clear_usernames: true }),
-        });
-      } catch {}
+      // Removed Turso mirror (serverless API deleted)
       // Clear in Firestore
       await updateDoc(doc(db, "users", u.id), { appUserName: null, leetcodeUsername: null, is_verified: false });
       setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, is_verified: false, appUserName: null, leetcodeUsername: null } : x)));
@@ -301,109 +239,7 @@ export default function Dashboard() {
           )}
         </section>
 
-        {/* Turso Registrations section removed */}
-
-        {/* Turso Users table (all columns) */}
-        <section className="glass-panel p-4 rounded-lg">
-          <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-            <h2 className="font-semibold">Turso Users ({tursoUsersRows.length})</h2>
-            <div className="flex items-center gap-2 flex-wrap">
-              <input
-                value={tursoUsersQuery}
-                onChange={(e) => setTursoUsersQuery(e.target.value)}
-                placeholder="Search user_id, app or LC username"
-                className="px-3 py-2 rounded-md bg-white/5 border border-white/10 min-w-[260px]"
-              />
-              <select
-                value={tursoUsersFilter}
-                onChange={(e) => setTursoUsersFilter(e.target.value as any)}
-                className="px-2 py-2 rounded-md bg-white/5 border border-white/10"
-              >
-                <option value="all">All</option>
-                <option value="verified">Verified</option>
-                <option value="unverified">Unverified</option>
-              </select>
-              <button onClick={loadTursoUsers} className="px-3 py-2 rounded-md bg-white/10 hover:bg-white/15 border border-white/15">Refresh</button>
-            </div>
-          </div>
-          {tursoUsersLoading ? (
-            <div className="text-white/70">Loading…</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left border-b border-white/10">
-                    {(() => {
-                      const allKeysSet = new Set<string>();
-                      tursoUsersRows.forEach((r) => Object.keys(r || {}).forEach((k) => allKeysSet.add(k)));
-                      const preferred = ["user_id", "app_username", "leetcode_username", "is_verified"]; // show these first if present
-                      const allKeys = [
-                        ...preferred.filter((k) => allKeysSet.has(k)),
-                        ...Array.from(allKeysSet).filter((k) => !preferred.includes(k)),
-                      ];
-                      return (
-                        <>
-                          {allKeys.map((k) => (
-                            <th key={k} className="py-2 pr-3 capitalize">{k.replace(/_/g, " ")}</th>
-                          ))}
-                          <th className="py-2 pr-3">Actions</th>
-                        </>
-                      );
-                    })()}
-                  </tr>
-                </thead>
-                <tbody>
-                  {tursoUsersRows.length === 0 ? (
-                    <tr>
-                      <td className="py-3 text-white/70" colSpan={99}>No users found.</td>
-                    </tr>
-                  ) : (
-                    tursoUsersRows.map((r, idx) => {
-                      const allKeysSet = new Set<string>();
-                      tursoUsersRows.forEach((row) => Object.keys(row || {}).forEach((k) => allKeysSet.add(k)));
-                      const preferred = ["user_id", "app_username", "leetcode_username", "is_verified"];
-                      const allKeys = [
-                        ...preferred.filter((k) => allKeysSet.has(k)),
-                        ...Array.from(allKeysSet).filter((k) => !preferred.includes(k)),
-                      ];
-                      return (
-                        <tr key={(r as any).user_id ?? idx} className="border-b border-white/5">
-                          {allKeys.map((k) => {
-                            const v = (r as any)[k];
-                            let text: string = "";
-                            if (v === null || v === undefined) text = "-";
-                            else if (typeof v === "object") text = JSON.stringify(v);
-                            else text = String(v);
-                            return (
-                              <td key={k} className="py-2 pr-3 max-w-[260px] truncate text-white/80">{text}</td>
-                            );
-                          })}
-                          <td className="py-2 pr-3">
-                            {((r as any).is_verified === 1 || (r as any).is_verified === true) ? (
-                              <button
-                                onClick={() => setTursoUserVerified(r, false)}
-                                className="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/15 text-white"
-                              >
-                                Unverify
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => setTursoUserVerified(r, true)}
-                                className="px-3 py-1.5 rounded-md bg-green-600/90 hover:bg-green-600 text-white"
-                              >
-                                Verify
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+        {/* Turso section removed */}
       </div>
     </div>
   );

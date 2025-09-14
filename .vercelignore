@@ -1,0 +1,2 @@
+# Exclude all serverless API routes from Vercel deployments
+api/**
