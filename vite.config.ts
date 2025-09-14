@@ -420,6 +420,69 @@ function devApiUsersPlugin(env: Record<string, string>): Plugin {
           res.end(JSON.stringify({ error: err?.message || "Database error" }));
         }
       });
+      // Per-user stats (for app dashboard)
+      server.middlewares.use("/api/user-stats", async (req, res) => {
+        try {
+          if (req.method !== "GET") {
+            res.statusCode = 405;
+            res.setHeader("Allow", "GET");
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ error: "Method Not Allowed" }));
+            return;
+          }
+          const dbUrl = env.TURSO_DATABASE_URL || process.env.TURSO_DATABASE_URL;
+          const dbToken = env.TURSO_AUTH_TOKEN || process.env.TURSO_AUTH_TOKEN;
+          if (!dbUrl || !dbToken) {
+            res.statusCode = 500;
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ error: "TURSO_DATABASE_URL or TURSO_AUTH_TOKEN not set" }));
+            return;
+          }
+          const full = new URL(req.url || "/api/user-stats", "http://localhost");
+          const user_id = (full.searchParams.get("user_id") || "").trim();
+          const username = (full.searchParams.get("username") || full.searchParams.get("app_username") || "").trim();
+          if (!user_id && !username) {
+            res.statusCode = 400;
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ error: "user_id or username is required" }));
+            return;
+          }
+          const client = createClient({ url: dbUrl, authToken: dbToken });
+          const where = user_id ? `user_id = ?` : `app_username = ?`;
+          const arg = user_id ? user_id : username;
+          const q = await client.execute({
+            sql: `SELECT 
+                    user_id,
+                    app_username AS username,
+                    is_verified,
+                    easy_solved,
+                    medium_solved,
+                    hard_solved,
+                    total_solved,
+                    current_streak,
+                    longest_streak,
+                    last_solved_date
+                  FROM users
+                  WHERE ${where}
+                  LIMIT 1`,
+            args: [arg],
+          });
+          const row = (q.rows?.[0] as any) || null;
+          if (!row) {
+            res.statusCode = 404;
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ error: "User not found" }));
+            return;
+          }
+          res.statusCode = 200;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ ok: true, user: row }));
+        } catch (err: any) {
+          res.statusCode = 500;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ error: err?.message || "Database error" }));
+        }
+      });
       server.middlewares.use("/api/leaderboard", async (req, res) => {
         try {
           if (req.method !== "GET") {
