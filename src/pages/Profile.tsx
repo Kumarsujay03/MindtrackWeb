@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/features/Auth/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, doc, getDoc, query, where, getDocs, updateDoc, serverTimestamp } from "firebase/firestore";
+import { collection, doc, getDoc, query, where, getDocs, updateDoc, serverTimestamp, runTransaction } from "firebase/firestore";
 import { formatDateDMY } from "@/lib/utils";
 
 type ProfileData = {
@@ -30,6 +30,9 @@ export default function Profile() {
   const [avatars, setAvatars] = useState<Array<{ name: string; url: string }>>([]);
   const [avatarsLoading, setAvatarsLoading] = useState(false);
   const [avatarsError, setAvatarsError] = useState<string | null>(null);
+  const [dobInput, setDobInput] = useState("");
+  const [genderInput, setGenderInput] = useState("");
+  const [savingProfileInfo, setSavingProfileInfo] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
 
   useEffect(() => {
@@ -114,6 +117,52 @@ export default function Profile() {
     }
   }
 
+  async function saveProfileInfoOnce() {
+    if (!user) return;
+    setSavingProfileInfo(true);
+    try {
+      const ref = doc(db, "users", user.uid);
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(ref);
+        const data = snap.exists() ? (snap.data() as any) : {};
+        const hasDob = !!data?.dob;
+        const hasGender = !!data?.gender;
+
+        if (hasDob && hasGender) {
+          throw new Error("Profile already completed.");
+        }
+
+        const payload: any = { updatedAt: serverTimestamp() };
+        if (!hasDob) {
+          if (!dobInput) throw new Error("Please select your Date of Birth.");
+          payload.dob = dobInput; // stored as YYYY-MM-DD
+        }
+        if (!hasGender) {
+          if (!genderInput) throw new Error("Please select your Gender.");
+          payload.gender = genderInput;
+        }
+
+        if (snap.exists()) {
+          tx.update(ref, payload);
+        } else {
+          tx.set(ref, payload, { merge: true });
+        }
+      });
+
+      setProfile((p) => ({
+        ...p,
+        dob: p.dob || dobInput,
+        gender: p.gender || genderInput,
+      }));
+      setDobInput("");
+      setGenderInput("");
+    } catch (e: any) {
+      alert(e?.message || "Failed to save. You can set DOB and Gender only once.");
+    } finally {
+      setSavingProfileInfo(false);
+    }
+  }
+
   return (
   <div className="max-w-4xl mx-auto w-full px-4 mt-6">
       <div className="glass-panel p-4 rounded-lg">
@@ -157,6 +206,53 @@ export default function Profile() {
           <Field label="LeetCode Username" value={profile.leetcodeUsername} />
           <Field label="Gender" value={profile.gender} />
         </div>
+
+        {/* One-time completion form for missing DOB/Gender */}
+        {(!profile.dob || !profile.gender) && (
+          <div className="mt-5 rounded-md border border-white/15 bg-white/5 p-3">
+            <div className="text-sm font-medium mb-2">Complete your profile</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {!profile.dob && (
+                <div>
+                  <label className="block text-xs uppercase tracking-wide text-white/60 mb-1">Date of Birth</label>
+                  <input
+                    type="date"
+                    value={dobInput}
+                    onChange={(e) => setDobInput(e.target.value)}
+                    className="w-full px-3 py-2 rounded-md bg-white/5 border border-white/15 text-white"
+                  />
+                </div>
+              )}
+              {!profile.gender && (
+                <div>
+                  <label className="block text-xs uppercase tracking-wide text-white/60 mb-1">Gender</label>
+                  <select
+                    value={genderInput}
+                    onChange={(e) => setGenderInput(e.target.value)}
+                    className="w-full px-3 py-2 rounded-md bg-white/5 border border-white/15 text-white"
+                  >
+                    <option value="">Select…</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                    <option value="Prefer not to say">Prefer not to say</option>
+                  </select>
+                </div>
+              )}
+            </div>
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={saveProfileInfoOnce}
+                disabled={savingProfileInfo}
+                className="px-4 py-2 rounded-md bg-primary/90 hover:bg-primary text-black disabled:opacity-60"
+              >
+                {savingProfileInfo ? "Saving…" : "Save"}
+              </button>
+              <span className="ml-3 text-xs text-white/60">You can set these only once.</span>
+            </div>
+          </div>
+        )}
         <div className="mt-6 rounded-md border border-white/15 bg-white/5 overflow-hidden">
           <button
             type="button"
