@@ -3,6 +3,14 @@ import { useAuth } from "@/features/Auth/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, doc, getDoc, query, where, getDocs, updateDoc, serverTimestamp, runTransaction } from "firebase/firestore";
 import { formatDateDMY } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type ProfileData = {
   activeProfileUrl: string | null;
@@ -226,17 +234,41 @@ export default function Profile() {
               {!profile.gender && (
                 <div>
                   <label className="block text-xs uppercase tracking-wide text-white/60 mb-1">Gender</label>
-                  <select
-                    value={genderInput}
-                    onChange={(e) => setGenderInput(e.target.value)}
-                    className="w-full px-3 py-2 rounded-md bg-white/5 border border-white/15 text-white"
-                  >
-                    <option value="">Select…</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Other">Other</option>
-                    <option value="Prefer not to say">Prefer not to say</option>
-                  </select>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-between bg-white/5 border-white/15 text-white hover:bg-white/10"
+                        aria-label="Select gender"
+                      >
+                        <span className={genderInput ? "text-white" : "text-white/60"}>
+                          {genderInput || "Select…"}
+                        </span>
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                          aria-hidden="true"
+                          className="opacity-80"
+                        >
+                          <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-full min-w-[12rem]">
+                      <DropdownMenuRadioGroup
+                        value={genderInput}
+                        onValueChange={(val) => setGenderInput(val)}
+                      >
+                        <DropdownMenuRadioItem value="Male">Male</DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="Female">Female</DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="Other">Other</DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="Prefer not to say">Prefer not to say</DropdownMenuRadioItem>
+                      </DropdownMenuRadioGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               )}
             </div>
