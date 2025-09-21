@@ -3,7 +3,7 @@ MindTrack Web
 
 A modern, privacy-conscious web app for focused studying and habit building. Includes an admin dashboard, user verification, a streak-based leaderboard, tasks, stopwatch/flowtime timers, and profile management with avatars.
 
-Live: https://mintrack-web.vercel.app/
+Live: https://mindtrack-web.vercel.app/
 
 
 Features

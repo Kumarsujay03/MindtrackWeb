@@ -54,6 +54,9 @@ export default function Leaderboard() {
         setSubmitted(!!(d?.appUserName && d?.leetcodeUsername) && !d?.is_verified);
         if (d?.adminLastAction) {
           setAdminBanner({ type: d.adminLastAction.type || "", reason: d.adminLastAction.reason ?? null });
+        } else if (d?.adminNotice) {
+          // Backwards-compat: some older docs may have adminNotice only
+          setAdminBanner({ type: d.adminNotice.type || "", reason: d.adminNotice.reason ?? null });
         } else {
           setAdminBanner(null);
         }

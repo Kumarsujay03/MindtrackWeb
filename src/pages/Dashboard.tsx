@@ -118,7 +118,6 @@ export default function Dashboard() {
           is_verified: true,
           appUserName: app,
           leetcodeUsername: lc,
-          adminNotice: null,
           adminLastAction: {
             type: "verify",
             reason: null,
@@ -129,11 +128,6 @@ export default function Dashboard() {
         const reason = window.prompt("Reason for un-verifying this user?", "Violation of rules / incorrect usernames");
         await updateDoc(doc(db, "users", u.id), {
           is_verified: false,
-          adminNotice: {
-            type: "unverify",
-            reason: (reason || "").trim() || null,
-            at: serverTimestamp(),
-          },
           adminLastAction: {
             type: "unverify",
             reason: (reason || "").trim() || null,
@@ -157,11 +151,6 @@ export default function Dashboard() {
       const reason = window.prompt("Reason for un-verifying this user?", "Violation of rules / incorrect usernames");
       await updateDoc(doc(db, "users", u.id), {
         is_verified: false,
-        adminNotice: {
-          type: "unverify",
-          reason: (reason || "").trim() || null,
-          at: serverTimestamp(),
-        },
         adminLastAction: {
           type: "unverify",
           reason: (reason || "").trim() || null,
@@ -196,11 +185,6 @@ export default function Dashboard() {
         appUserName: null,
         leetcodeUsername: null,
         is_verified: false,
-        adminNotice: {
-          type: "delete",
-          reason: (reason || "").trim() || null,
-          at: serverTimestamp(),
-        },
         adminLastAction: {
           type: "delete",
           reason: (reason || "").trim() || null,
