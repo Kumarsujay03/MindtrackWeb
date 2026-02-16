@@ -8,14 +8,17 @@ export default async function handler(req: any, res: any) {
 
   const nowMinute = floorToUtcMinute(Date.now());
   const schedule = getCurrentSchedule(nowMinute);
+  const invocationWindowMin = 5;
 
-  if (nowMinute !== schedule.nextPingAt) {
+  const isDue = nowMinute >= schedule.lastPingAt && nowMinute < schedule.lastPingAt + invocationWindowMin * 60000;
+
+  if (!isDue) {
     const waitMin = Math.max(0, Math.round((schedule.nextPingAt - nowMinute) / 60000));
     return res.status(200).json({
       ok: true,
       action: "skipped",
       reason: "waiting_for_random_window",
-      nextDelayMin: schedule.nextIntervalMin,
+      nextDelayMin: schedule.lastIntervalMin,
       waitMin,
       nextPingAt: new Date(schedule.nextPingAt).toISOString(),
       targetUrl,
@@ -40,7 +43,7 @@ export default async function handler(req: any, res: any) {
       pingStatus: pingRes.status,
       latencyMs: Date.now() - startedAt,
       nextDelayMin: schedule.nextIntervalMin,
-      nextPingAt: new Date(schedule.nextPingAt + schedule.nextIntervalMin * 60000).toISOString(),
+      nextPingAt: new Date(schedule.nextPingAt).toISOString(),
       targetUrl,
     });
   } catch (e: any) {
@@ -52,13 +55,15 @@ export default async function handler(req: any, res: any) {
       pingError: e?.message || "Ping failed",
       latencyMs: Date.now() - startedAt,
       nextDelayMin: schedule.nextIntervalMin,
-      nextPingAt: new Date(schedule.nextPingAt + schedule.nextIntervalMin * 60000).toISOString(),
+      nextPingAt: new Date(schedule.nextPingAt).toISOString(),
       targetUrl,
     });
   }
 }
 
 type ScheduleState = {
+  lastPingAt: number;
+  lastIntervalMin: number;
   nextPingAt: number;
   nextIntervalMin: number;
 };
@@ -81,16 +86,23 @@ function intervalFromSeed(seed: number) {
 function getCurrentSchedule(nowMinuteMs: number): ScheduleState {
   let current = START_UTC_MS;
   let seed = SEED_START;
-  let nextInterval = intervalFromSeed(seed);
+  let interval = intervalFromSeed(seed);
+  let next = current + interval * 60000;
 
-  while (current < nowMinuteMs) {
+  while (next <= nowMinuteMs) {
+    current = next;
     seed = lcg(seed);
-    nextInterval = intervalFromSeed(seed);
-    current += nextInterval * 60000;
+    interval = intervalFromSeed(seed);
+    next = current + interval * 60000;
   }
 
+  const nextSeed = lcg(seed);
+  const nextInterval = intervalFromSeed(nextSeed);
+
   return {
-    nextPingAt: current,
+    lastPingAt: current,
+    lastIntervalMin: interval,
+    nextPingAt: next,
     nextIntervalMin: nextInterval,
   };
 }
